@@ -1,0 +1,25 @@
+{
+  "schema": "1.0",
+  "type": "whmcs-registrars",
+  "name": "cosmotown",
+  "license": "proprietary",
+  "category": "domains",
+  "description": {
+    "name": "Cosmotown",
+    "tagline": "A global ICANN-accredited registrar and domain resale provider.",
+    "long": ""
+  },
+  "logo": {
+    "filename": "logo.png"
+  },
+  "support": {
+    "homepage": "https:\/\/www.cosmotown.com\/",
+    "docs_url": "https:\/\/www.cosmotown.com\/"
+  },
+  "authors": [
+    {
+      "name": "Cosmotown Inc",
+      "homepage": "https://www.cosmotown.com/"
+    }
+  ]
+}

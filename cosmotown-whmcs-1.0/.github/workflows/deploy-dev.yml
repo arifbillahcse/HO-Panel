@@ -1,0 +1,23 @@
+name: deploy-dev
+on:
+  push:
+    branches:
+      - 'releases/**'
+jobs:
+  deploy-to-dev:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install SSH Key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.DEV_SERVER_DEPLOYMENT }}
+          known_hosts: "prevent issues"
+      - name: Adding Known Hosts
+        run: ssh-keyscan -H ${{ secrets.DEV_SERVER_HOST }} >> ~/.ssh/known_hosts
+      - name: Fetch latest code
+        run: |
+            git clone git@github.com:sharapov-outsource/whmcs-cosmotown.git cosmotown
+            rm -Rf cosmotown/.git
+      - name: Deploy
+        run: | 
+            rsync -avz ./cosmotown/* ${{ secrets.DEV_SERVER_USER }}@${{ secrets.DEV_SERVER_HOST }}:/home/cosmotown3/public_html/whmcs.cosmotown3.com/modules/registrars/cosmotown/
