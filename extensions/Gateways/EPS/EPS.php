@@ -125,7 +125,29 @@ class EPS extends Gateway
     }
 
     /**
+     * Hide EPS from checkout unless the customer is paying in Taka.
+     *
+     * Paymenter asks this before listing gateways on the cart, on an invoice
+     * and on the credit top-up form, so a customer shopping in USD simply
+     * never sees EPS rather than picking it and hitting an error.
+     *
+     * @param  mixed  $total
+     * @param  string  $currency
+     * @param  string  $type
+     * @param  mixed  $items
+     */
+    public function canUseGateway($total, $currency, $type, $items = []): bool
+    {
+        return strtoupper((string) $currency) === self::CURRENCY;
+    }
+
+    /**
      * Start a payment and hand back the EPS hosted page URL.
+     *
+     * The currency is checked again here. canUseGateway() already hides EPS
+     * from anyone shopping in another currency, but nothing stops an invoice
+     * being paid through a stale form or a direct call, and billing a USD
+     * amount as Taka would be a hundredfold mistake.
      *
      * @param  mixed  $total
      */
