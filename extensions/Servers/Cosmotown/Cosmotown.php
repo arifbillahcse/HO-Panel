@@ -9,6 +9,7 @@ use App\Helpers\ExtensionHelper;
 use App\Helpers\NotificationHelper;
 use App\Models\Service;
 use App\Rules\Domain as DomainRule;
+use Paymenter\Extensions\Servers\Cosmotown\Rules\UniqueDomain;
 use Exception;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -196,7 +197,7 @@ class Cosmotown extends Server
                 'type' => 'text',
                 'label' => 'Domain name',
                 'placeholder' => 'example.com',
-                'validation' => [new DomainRule, 'required'],
+                'validation' => [new DomainRule, new UniqueDomain, 'required'],
                 'required' => true,
             ],
         ];
