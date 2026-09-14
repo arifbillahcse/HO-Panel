@@ -59,11 +59,18 @@
             </div>
             <h2 class="text-lg font-semibold mt-4">No domains yet</h2>
             <p class="text-sm text-base/60 mt-1.5 max-w-sm mx-auto">Search for a name and it will appear here once registered.</p>
-            <a href="{{ route('domainservice.search') }}" wire:navigate class="inline-block mt-5">
-                <span class="flex items-center gap-2 justify-center bg-primary text-white text-sm font-semibold hover:bg-primary/80 py-2.5 px-4.5 rounded-md duration-300">
-                    Find a domain <x-ri-arrow-right-fill class="size-4" />
-                </span>
-            </a>
+            <div class="flex flex-wrap items-center justify-center gap-3 mt-5">
+                <a href="{{ route('domainservice.search') }}" wire:navigate>
+                    <span class="flex items-center gap-2 justify-center bg-primary text-white text-sm font-semibold hover:bg-primary/80 py-2.5 px-4.5 rounded-md duration-300">
+                        Find a domain <x-ri-arrow-right-fill class="size-4" />
+                    </span>
+                </a>
+                <a href="{{ route('domainservice.transfer') }}" wire:navigate>
+                    <span class="flex items-center gap-2 justify-center bg-background-secondary border border-neutral text-sm font-semibold hover:bg-background-secondary/80 py-2.5 px-4.5 rounded-md duration-300">
+                        Transfer a domain
+                    </span>
+                </a>
+            </div>
         </div>
     @endforelse
 
