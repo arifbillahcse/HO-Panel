@@ -6,6 +6,7 @@ use App\Exceptions\DisplayException;
 use App\Livewire\Component;
 use App\Models\Currency;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Url;
 use Paymenter\Extensions\Others\DomainService\Models\DomainTld;
 use Paymenter\Extensions\Others\DomainService\Services\DomainOrderService;
@@ -32,6 +33,16 @@ class Search extends Component
 
     public function search(): void
     {
+        // Search triggers outbound RDAP lookups, so cap it per client to stop
+        // the public page being used as a lookup amplifier.
+        $key = 'domainsearch:' . request()->ip();
+        if (RateLimiter::tooManyAttempts($key, 20)) {
+            $this->notice = 'Too many searches. Please wait a moment and try again.';
+
+            return;
+        }
+        RateLimiter::hit($key, 60);
+
         $this->results = [];
         $this->notice = null;
         $this->searched = true;
@@ -80,10 +91,31 @@ class Search extends Component
             return null;
         }
 
+        // Cap orders per customer so a signed-in account cannot spam pending
+        // domains and unpaid invoices.
+        $key = 'domainorder:' . Auth::id();
+        if (RateLimiter::tooManyAttempts($key, 10)) {
+            $this->notify('Too many attempts. Please wait a minute and try again.', 'error');
+
+            return null;
+        }
+        RateLimiter::hit($key, 60);
+
+        $name = $label . '.' . $tld;
+
+        // Do not take money for a domain that is already registered elsewhere.
+        // Only a definite "taken" blocks — an RDAP hiccup (unknown) must not
+        // stop a legitimate order.
+        if ((new DomainAvailability)->check([$name])[$name] === DomainAvailability::TAKEN) {
+            $this->notify('That domain was just taken. Please choose another.', 'error');
+
+            return null;
+        }
+
         try {
             $invoice = app(DomainOrderService::class)->register(
                 Auth::user(),
-                $label . '.' . $tld,
+                $name,
                 $this->currency(),
             );
         } catch (DisplayException $e) {

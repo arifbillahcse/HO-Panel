@@ -29,6 +29,12 @@ class DomainOrderService
         $name = strtolower(trim($name));
         $currency = strtoupper($currency);
 
+        // Validate the whole name here, not just at the UI, so no caller can
+        // push a malformed name through to a registrar.
+        if (!preg_match('/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/', $name)) {
+            throw new DisplayException('That is not a valid domain name.');
+        }
+
         [$sld, $tldName] = $this->split($name);
         $tld = $this->tld($tldName);
         $pricing = $this->pricing($tld, $currency);
