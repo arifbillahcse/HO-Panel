@@ -11,7 +11,9 @@ Registers and renews domain names through the Cosmotown reseller API.
 | Nameservers at registration | yes |
 | Registrar lock | yes, customer-toggleable |
 | WHOIS privacy | yes, customer-toggleable |
+| Nameserver editing | yes, in the client area |
 | Availability search | yes, at `/domains` |
+| Client-area domain list | yes, at `/domains/manage` |
 | Transfers | no — planned |
 | EPP codes | no — endpoint unverified |
 | WHOIS contact edits | no — endpoint unverified |
@@ -71,6 +73,26 @@ claiming a taken domain is free.
 If search shows *"No domain extensions are configured for sale yet"*, the
 product either has no `TLD` option attached or its `env_variable` is not
 exactly `tld`.
+
+## Client area
+
+A **Domains** entry appears in the customer sidebar, between Services and
+Invoices.
+
+**`/domains/manage`** lists their domains with status, renewal date and price.
+
+**`/domains/manage/{service}`** is the management screen: edit up to five
+nameservers, toggle the registrar lock, toggle WHOIS privacy. Access is gated
+by Paymenter's own `can:view,service`, so a customer cannot open someone
+else's domain by changing the id.
+
+Registrar state is read live (cached five minutes) and the cache is cleared
+whenever a change is saved, so the page never shows a stale value after an
+edit. If Cosmotown is unreachable the page says so rather than showing blank
+fields that would look like a domain with no nameservers.
+
+Billing for a domain stays on the normal service page — the Domains pages
+handle the registrar side only.
 
 ## How renewal works
 

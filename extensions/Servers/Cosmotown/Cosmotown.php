@@ -10,11 +10,13 @@ use App\Helpers\NotificationHelper;
 use App\Models\Service;
 use App\Rules\Domain as DomainRule;
 use Exception;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\View;
 use Livewire\Livewire;
+use Paymenter\Extensions\Servers\Cosmotown\Livewire\Domains;
 use Paymenter\Extensions\Servers\Cosmotown\Livewire\DomainSearch;
 
 #[ExtensionMeta(
@@ -46,6 +48,8 @@ class Cosmotown extends Server
         View::addNamespace('cosmotown', __DIR__ . '/resources/views');
 
         Livewire::component('cosmotown-domain-search', DomainSearch::class);
+        Livewire::component('cosmotown-domains-index', Domains\Index::class);
+        Livewire::component('cosmotown-domains-show', Domains\Show::class);
 
         // Put Domains in the storefront nav beside Shop.
         Event::listen('navigation', function () {
@@ -54,6 +58,17 @@ class Cosmotown extends Server
                 'url' => route('cosmotown.search'),
                 'icon' => 'ri-global-line',
                 'priority' => 20,
+            ];
+        });
+
+        // And in the client sidebar, between Services (20) and Invoices (30).
+        Event::listen('navigation.dashboard', function () {
+            return [
+                'name' => 'Domains',
+                'url' => route('cosmotown.domains'),
+                'icon' => 'ri-global-line',
+                'condition' => Auth::check(),
+                'priority' => 25,
             ];
         });
 
@@ -301,6 +316,54 @@ class Cosmotown extends Server
         Cache::forget($this->infoCacheKey($domain));
 
         return route('services.show', $service);
+    }
+
+    /**
+     * Current registrar state for the client area domain pages.
+     *
+     * Reached through ExtensionHelper::callService so the credentials belong
+     * to the server row this service actually uses.
+     */
+    public function getDomainDetails(Service $service, $settings, $properties): ?array
+    {
+        if (!isset($properties[self::REGISTERED_KEY])) {
+            return null;
+        }
+
+        return $this->cachedDomainInfo($this->domain($properties));
+    }
+
+    /**
+     * @param  array<string>  $nameservers
+     */
+    public function updateNameservers(Service $service, $settings, $properties, array $nameservers = []): bool
+    {
+        $domain = $this->domain($properties);
+
+        $this->api()->saveNameservers($domain, $nameservers);
+        Cache::forget($this->infoCacheKey($domain));
+
+        return true;
+    }
+
+    public function setLock(Service $service, $settings, $properties, bool $locked = true): bool
+    {
+        $domain = $this->domain($properties);
+
+        $this->api()->setDomainOption($domain, 'lock_domain', $locked);
+        Cache::forget($this->infoCacheKey($domain));
+
+        return true;
+    }
+
+    public function setPrivacy(Service $service, $settings, $properties, bool $enabled = true): bool
+    {
+        $domain = $this->domain($properties);
+
+        $this->api()->setDomainOption($domain, 'enable_private_whois', $enabled);
+        Cache::forget($this->infoCacheKey($domain));
+
+        return true;
     }
 
     /**
