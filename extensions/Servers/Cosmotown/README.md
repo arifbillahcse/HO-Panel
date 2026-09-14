@@ -41,9 +41,16 @@ Give it a **yearly recurring** plan so Paymenter raises renewal invoices on sche
 
 **3. Price your TLDs**
 
-Cosmotown's API publishes no wholesale price list, so retail prices are yours to set.
+Cosmotown's API publishes no wholesale price list, so retail prices are yours to
+set. Either layout works — search picks up both automatically.
 
-Admin → Configurable Options → create a **Select** named `TLD`, one option per extension with its own price:
+*A product per TLD.* Name the product after the extension (`.com`, `.net`) and
+put the price on its plan. Simplest to reason about, and each TLD gets its own
+description, image and stock limit.
+
+*One product, many TLDs.* Add a **Select** configurable option with
+**Environment Variable** set to exactly `tld`, one value per extension with its
+own price:
 
 ```
 .com   1,400 BDT
@@ -51,7 +58,8 @@ Admin → Configurable Options → create a **Select** named `TLD`, one option p
 .org   1,500 BDT
 ```
 
-Attach it to the product. Config option prices are included in renewal invoices as well as the first one, so a single product covers every TLD you sell.
+Less admin work once you sell more than a handful. Config option prices are
+included in renewal invoices as well as the first one.
 
 ## Domain search
 
