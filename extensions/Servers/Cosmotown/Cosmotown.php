@@ -221,6 +221,15 @@ class Cosmotown extends Server
         $domain = $this->domain($properties);
         $years = max(1, (int) ($settings['years'] ?? 1));
 
+        // Name the service after the domain before anything can fail. Without
+        // this every domain shows as ".com #5" — Service::label falls back to
+        // the product name and id — which is unusable once a customer holds
+        // more than one, and useless to you in the admin list.
+        if (!$service->getRawOriginal('label')) {
+            $service->label = $domain;
+            $service->save();
+        }
+
         if (($settings['mode'] ?? 'register') === 'transfer') {
             return $this->startTransfer($service, $domain, $properties);
         }
