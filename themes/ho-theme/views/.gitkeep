@@ -1,0 +1,9 @@
+Blade overrides go here.
+
+Any file placed at the same path as one in themes/default/views wins; anything
+absent falls through to the default theme, so this directory stays empty until
+you actually need to change markup.
+
+Example: to restyle only the homepage, create
+    themes/ho-theme/views/home.blade.php
+and leave everything else inherited.

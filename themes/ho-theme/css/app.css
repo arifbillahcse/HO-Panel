@@ -1,0 +1,22 @@
+/*
+ | ho-theme — Hostorio
+ |
+ | This theme renders Blade inherited from the `default` theme (registered as the
+ | parent in SettingsProvider), so Tailwind must scan default/views as well as our
+ | own. Without the sources below the build emits almost no utility classes.
+ */
+
+@import "../../default/css/app.css";
+
+@source "../../default/views";
+@source "../views";
+@source "../../../extensions/**/*.blade.php";
+
+/* Hostorio brand refinements — everything else comes from theme.php tokens. */
+
+/* The brand's orange carries actions; give it the same focus treatment the
+   primary colour gets so secondary buttons stay keyboard-legible. */
+.focus-secondary:focus-visible {
+    outline: 2px solid hsl(var(--color-secondary));
+    outline-offset: 2px;
+}
