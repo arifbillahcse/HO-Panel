@@ -135,7 +135,7 @@ class Show extends Component
             $this->domain->driver()->setLock($this->domain, $newValue);
             $this->locked = $newValue;
             $this->domain->update(['locked' => $newValue]);
-        }, $this->locked ? 'Domain unlocked.' : 'Domain locked.', reload: false);
+        }, ($this->locked ? 'Domain unlocked.' : 'Domain locked.') . ' It may take a minute to show as updated everywhere.', reload: false);
     }
 
     public function togglePrivacy(): void
@@ -146,7 +146,7 @@ class Show extends Component
             $this->domain->driver()->setPrivacy($this->domain, $newValue);
             $this->privacy = $newValue;
             $this->domain->update(['privacy' => $newValue]);
-        }, $this->privacy ? 'WHOIS privacy disabled.' : 'WHOIS privacy enabled.', reload: false);
+        }, ($this->privacy ? 'WHOIS privacy disabled.' : 'WHOIS privacy enabled.') . ' It may take a minute to show as updated everywhere.', reload: false);
     }
 
     /**
