@@ -45,6 +45,9 @@ class Cosmotown extends Server
 
     private const AUTH_CODE_KEY = 'auth_code';
 
+    /** register | transfer — the action the customer chose at checkout. */
+    private const ACTION_KEY = 'domain_action';
+
     /** pending | complete | failed — only set on transfer orders. */
     private const TRANSFER_KEY = 'cosmotown_transfer_status';
 
@@ -159,18 +162,6 @@ class Cosmotown extends Server
     {
         return [
             [
-                'name' => 'mode',
-                'type' => 'select',
-                'label' => 'Order type',
-                'description' => 'Registration takes a new domain. Transfer moves one in from another registrar and asks the customer for an auth code.',
-                'options' => [
-                    ['value' => 'register', 'label' => 'Registration'],
-                    ['value' => 'transfer', 'label' => 'Transfer in'],
-                ],
-                'default' => 'register',
-                'required' => true,
-            ],
-            [
                 'name' => 'years',
                 'type' => 'number',
                 'label' => 'Registration period (years)',
@@ -191,7 +182,24 @@ class Cosmotown extends Server
 
     public function getCheckoutConfig($product = null, $values = [], $settings = []): array
     {
+        // The customer chooses register or transfer here rather than it being
+        // fixed per product, so one product per TLD serves both. The field is
+        // wire:model.live, so picking "transfer" re-runs this method and the
+        // authorisation-code field below appears.
+        $action = ($values[self::ACTION_KEY] ?? 'register') === 'transfer' ? 'transfer' : 'register';
+
         $fields = [
+            [
+                'name' => self::ACTION_KEY,
+                'type' => 'select',
+                'label' => 'What would you like to do?',
+                'options' => [
+                    'register' => 'Register a new domain',
+                    'transfer' => 'Transfer a domain in from another registrar',
+                ],
+                'default' => 'register',
+                'required' => true,
+            ],
             [
                 'name' => self::DOMAIN_KEY,
                 'type' => 'text',
@@ -202,12 +210,12 @@ class Cosmotown extends Server
             ],
         ];
 
-        if (($settings['mode'] ?? 'register') === 'transfer') {
+        if ($action === 'transfer') {
             $fields[] = [
                 'name' => self::AUTH_CODE_KEY,
                 'type' => 'text',
-                'label' => 'Authorisation code',
-                'description' => 'Also called an EPP or transfer code. Get it from your current registrar, and make sure the domain is unlocked there.',
+                'label' => 'Authorisation code (EPP)',
+                'description' => 'Get it from your current registrar. Unlock the domain and turn WHOIS privacy off there first, and make sure it is more than 60 days old.',
                 'placeholder' => 'ABC123-xyz',
                 'validation' => 'required|string|max:255',
                 'required' => true,
@@ -231,7 +239,7 @@ class Cosmotown extends Server
             $service->save();
         }
 
-        if (($settings['mode'] ?? 'register') === 'transfer') {
+        if (($properties[self::ACTION_KEY] ?? 'register') === 'transfer') {
             return $this->startTransfer($service, $domain, $properties);
         }
 
