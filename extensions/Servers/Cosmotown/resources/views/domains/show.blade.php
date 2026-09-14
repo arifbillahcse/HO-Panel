@@ -47,8 +47,11 @@
         <div class="mt-8 flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 p-4">
             <x-ri-error-warning-fill class="size-5 text-warning shrink-0 mt-0.5" />
             <div>
-                <p class="font-semibold">This domain isn't registered yet</p>
-                <p class="text-sm text-base/60 mt-0.5">Management options appear once registration completes.</p>
+                <p class="font-semibold">We can't find this domain at the registrar</p>
+                <p class="text-sm text-base/60 mt-0.5">
+                    Management options appear once registration completes. If you believe it is already
+                    registered, contact support and we'll look into it.
+                </p>
             </div>
         </div>
     @else

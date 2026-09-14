@@ -16,7 +16,6 @@
     @forelse ($domains as $service)
         @php
             $name = $service->properties->firstWhere('key', 'domain')?->value;
-            $registered = $service->properties->contains('key', 'cosmotown_registered_at');
             $transfer = $service->properties->firstWhere('key', 'cosmotown_transfer_status')?->value;
         @endphp
 
@@ -63,8 +62,6 @@
                     </p>
                 @elseif ($transfer === 'failed')
                     <p class="text-sm text-error mt-2.5">Transfer could not be completed. We've been notified.</p>
-                @elseif (!$registered)
-                    <p class="text-sm text-warning mt-2.5">Registration has not completed yet.</p>
                 @endif
             </div>
 
@@ -73,7 +70,11 @@
                     class="text-sm font-semibold text-primary hover:text-primary/80">
                     Billing
                 </a>
-                @if ($registered)
+                {{-- Shown for anything that is not mid-transfer. Whether the
+                     domain is actually manageable is decided by the registrar
+                     on the page itself, not by a local flag that pre-existing
+                     domains could never satisfy. --}}
+                @if ($transfer !== 'pending')
                     <a href="{{ route('cosmotown.domains.show', $service) }}" wire:navigate>
                         <span class="flex items-center gap-2 justify-center bg-primary text-white text-sm font-semibold hover:bg-primary/80 py-2.5 px-5 rounded-md duration-300 whitespace-nowrap">
                             <x-ri-settings-3-line class="size-4" />

@@ -308,14 +308,10 @@ class Cosmotown extends Server
             ]];
         }
 
-        if (!isset($properties[self::REGISTERED_KEY])) {
-            return [];
-        }
-
         $domain = $this->domain($properties);
 
         try {
-            $info = $this->cachedDomainInfo($domain);
+            $info = $this->getDomainDetails($service, $settings, $properties);
         } catch (Exception $e) {
             return [[
                 'type' => 'text',
@@ -325,7 +321,11 @@ class Cosmotown extends Server
         }
 
         if (!$info) {
-            return [];
+            return [[
+                'type' => 'text',
+                'label' => 'Domain',
+                'text' => $domain . ' — not registered at Cosmotown yet',
+            ]];
         }
 
         $locked = (bool) ($info['locked'] ?? false);
@@ -521,11 +521,25 @@ class Cosmotown extends Server
      */
     public function getDomainDetails(Service $service, $settings, $properties): ?array
     {
-        if (!isset($properties[self::REGISTERED_KEY])) {
+        // A transfer still in flight is not ours to manage yet.
+        if (($properties[self::TRANSFER_KEY] ?? null) === 'pending') {
             return null;
         }
 
-        return $this->cachedDomainInfo($this->domain($properties));
+        $info = $this->cachedDomainInfo($this->domain($properties));
+
+        // Cosmotown is the authority on whether a domain is manageable, not a
+        // flag this extension happened to write. Domains that predate the
+        // panel, or were registered straight at the registrar, are just as
+        // manageable — so adopt them rather than refusing to touch them.
+        if ($info && !isset($properties[self::REGISTERED_KEY])) {
+            $service->properties()->updateOrCreate(
+                ['key' => self::REGISTERED_KEY],
+                ['name' => 'Registered at', 'value' => now()->toDateTimeString()],
+            );
+        }
+
+        return $info;
     }
 
     /**
