@@ -43,7 +43,7 @@ class RegistrarManager
     {
         return [
             'cosmotown' => 'Cosmotown',
-            // 'resellerclub' => 'ResellerClub',  // Phase 3
+            'resellerclub' => 'ResellerClub',
         ];
     }
 }

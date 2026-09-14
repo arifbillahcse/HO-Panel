@@ -15,21 +15,30 @@ class EditRegistrar extends EditRecord
         return [DeleteAction::make()];
     }
 
-    // Never surface the stored key back into the form.
+    // Never surface a stored secret back into the form.
     protected function mutateFormDataBeforeFill(array $data): array
     {
-        unset($data['apikey'], $data['credentials']);
+        foreach (CreateRegistrar::CREDENTIAL_FIELDS as $field) {
+            unset($data[$field]);
+        }
+        unset($data['credentials']);
 
         return $data;
     }
 
-    // Only overwrite the key when a new one was actually entered.
+    // Merge only the credential fields that were actually re-entered, so
+    // leaving a field blank keeps its stored value.
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        if (filled($data['apikey'] ?? null)) {
-            $data['credentials'] = ['apikey' => $data['apikey']];
+        $existing = (array) ($this->record->credentials ?? []);
+
+        foreach (CreateRegistrar::CREDENTIAL_FIELDS as $field) {
+            if (filled($data[$field] ?? null)) {
+                $existing[$field] = $data[$field];
+            }
+            unset($data[$field]);
         }
-        unset($data['apikey']);
+        $data['credentials'] = $existing;
 
         return $data;
     }

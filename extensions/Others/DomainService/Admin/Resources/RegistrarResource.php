@@ -9,6 +9,7 @@ use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -40,19 +41,38 @@ class RegistrarResource extends Resource
                 ->placeholder('e.g. Cosmotown (live)'),
             Select::make('driver')
                 ->required()
+                ->live()
                 ->options(fn () => app(RegistrarManager::class)->available())
                 ->native(false),
-            // Virtual field. Packed into the encrypted credentials array by the
-            // Create/Edit pages, and never re-displayed — an admin who opens
-            // the form cannot read the stored key, only replace it.
+            // Credential fields are per driver — each is packed into the
+            // encrypted credentials array by the Create/Edit pages and never
+            // re-displayed, so an admin cannot read a stored secret, only
+            // replace it. Adding a driver with different credentials is just
+            // another conditional field here.
             TextInput::make('apikey')
                 ->label('API key')
                 ->password()
                 ->revealable()
+                ->visible(fn (Get $get) => $get('driver') === 'cosmotown')
                 ->dehydrated(fn ($state) => filled($state))
-                ->required(fn (string $operation) => $operation === 'create')
+                ->required(fn (string $operation, Get $get) => $operation === 'create' && $get('driver') === 'cosmotown')
                 ->placeholder('Leave blank to keep the current key')
                 ->helperText('Stored encrypted. Paste the reseller API key only, never a password.'),
+            TextInput::make('reseller_id')
+                ->label('Reseller ID (auth-userid)')
+                ->visible(fn (Get $get) => $get('driver') === 'resellerclub')
+                ->dehydrated(fn ($state) => filled($state))
+                ->required(fn (string $operation, Get $get) => $operation === 'create' && $get('driver') === 'resellerclub')
+                ->placeholder('Leave blank to keep the current value'),
+            TextInput::make('api_key')
+                ->label('API key')
+                ->password()
+                ->revealable()
+                ->visible(fn (Get $get) => $get('driver') === 'resellerclub')
+                ->dehydrated(fn ($state) => filled($state))
+                ->required(fn (string $operation, Get $get) => $operation === 'create' && $get('driver') === 'resellerclub')
+                ->placeholder('Leave blank to keep the current key')
+                ->helperText('Stored encrypted.'),
             Toggle::make('sandbox')
                 ->helperText('Use the registrar sandbox. Sandbox keys differ from live ones.'),
             Toggle::make('enabled')

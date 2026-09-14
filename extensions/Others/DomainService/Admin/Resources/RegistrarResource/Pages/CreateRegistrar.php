@@ -9,10 +9,19 @@ class CreateRegistrar extends CreateRecord
 {
     protected static string $resource = RegistrarResource::class;
 
+    /** Credential field names across all drivers, packed into credentials. */
+    public const CREDENTIAL_FIELDS = ['apikey', 'reseller_id', 'api_key'];
+
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        $data['credentials'] = ['apikey' => $data['apikey'] ?? ''];
-        unset($data['apikey']);
+        $credentials = [];
+        foreach (self::CREDENTIAL_FIELDS as $field) {
+            if (filled($data[$field] ?? null)) {
+                $credentials[$field] = $data[$field];
+            }
+            unset($data[$field]);
+        }
+        $data['credentials'] = $credentials;
 
         return $data;
     }

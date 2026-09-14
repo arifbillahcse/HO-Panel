@@ -15,7 +15,7 @@ class Domain extends Model
     public const STATUS_CANCELLED = 'cancelled';
 
     protected $fillable = [
-        'user_id', 'registrar_id', 'name', 'sld', 'tld', 'currency', 'auth_code', 'status',
+        'user_id', 'registrar_id', 'name', 'sld', 'tld', 'registrar_ref', 'currency', 'auth_code', 'status',
         'registered_at', 'expires_at', 'nameservers', 'locked', 'privacy', 'autorenew',
     ];
 
