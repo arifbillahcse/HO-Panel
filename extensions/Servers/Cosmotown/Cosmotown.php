@@ -62,7 +62,7 @@ class Cosmotown extends Server
             return [
                 'name' => 'Domains',
                 'url' => route('cosmotown.search'),
-                'icon' => 'ri-global-line',
+                'icon' => 'ri-global',
                 'priority' => 20,
             ];
         });
@@ -72,7 +72,7 @@ class Cosmotown extends Server
             return [
                 'name' => 'Domains',
                 'url' => route('cosmotown.domains'),
-                'icon' => 'ri-global-line',
+                'icon' => 'ri-global',
                 'condition' => Auth::check(),
                 'priority' => 25,
             ];
