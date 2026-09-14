@@ -13,6 +13,9 @@ use Exception;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\View;
+use Livewire\Livewire;
+use Paymenter\Extensions\Servers\Cosmotown\Livewire\DomainSearch;
 
 #[ExtensionMeta(
     name: 'Cosmotown',
@@ -38,6 +41,22 @@ class Cosmotown extends Server
 
     public function boot()
     {
+        require __DIR__ . '/routes/web.php';
+
+        View::addNamespace('cosmotown', __DIR__ . '/resources/views');
+
+        Livewire::component('cosmotown-domain-search', DomainSearch::class);
+
+        // Put Domains in the storefront nav beside Shop.
+        Event::listen('navigation', function () {
+            return [
+                'name' => 'Domains',
+                'url' => route('cosmotown.search'),
+                'icon' => 'ri-global-line',
+                'priority' => 20,
+            ];
+        });
+
         Event::listen(Paid::class, function (Paid $event) {
             foreach ($event->invoice->items as $item) {
                 if ($item->reference_type !== Service::class) {
