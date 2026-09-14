@@ -16,6 +16,9 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Paymenter\Extensions\Others\DomainService\Admin\Resources\RegistrarResource\Pages\CreateRegistrar;
+use Paymenter\Extensions\Others\DomainService\Admin\Resources\RegistrarResource\Pages\EditRegistrar;
+use Paymenter\Extensions\Others\DomainService\Admin\Resources\RegistrarResource\Pages\ListRegistrars;
 use Paymenter\Extensions\Others\DomainService\Models\DomainRegistrar;
 use Paymenter\Extensions\Others\DomainService\Registrars\RegistrarManager;
 use Throwable;
@@ -115,9 +118,9 @@ class RegistrarResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListRegistrars::route('/'),
-            'create' => Pages\CreateRegistrar::route('/create'),
-            'edit' => Pages\EditRegistrar::route('/{record}/edit'),
+            'index' => ListRegistrars::route('/'),
+            'create' => CreateRegistrar::route('/create'),
+            'edit' => EditRegistrar::route('/{record}/edit'),
         ];
     }
 }

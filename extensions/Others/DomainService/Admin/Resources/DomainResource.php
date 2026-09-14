@@ -8,6 +8,7 @@ use Filament\Resources\Resource;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Paymenter\Extensions\Others\DomainService\Admin\Resources\DomainResource\Pages\ListDomains;
 use Paymenter\Extensions\Others\DomainService\Models\Domain;
 use Throwable;
 
@@ -75,7 +76,7 @@ class DomainResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListDomains::route('/'),
+            'index' => ListDomains::route('/'),
         ];
     }
 

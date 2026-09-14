@@ -16,6 +16,9 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Str;
+use Paymenter\Extensions\Others\DomainService\Admin\Resources\TldPricingResource\Pages\CreateTldPricing;
+use Paymenter\Extensions\Others\DomainService\Admin\Resources\TldPricingResource\Pages\EditTldPricing;
+use Paymenter\Extensions\Others\DomainService\Admin\Resources\TldPricingResource\Pages\ListTldPricing;
 use Paymenter\Extensions\Others\DomainService\Models\DomainRegistrar;
 use Paymenter\Extensions\Others\DomainService\Models\DomainTld;
 
@@ -96,9 +99,9 @@ class TldPricingResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListTldPricing::route('/'),
-            'create' => Pages\CreateTldPricing::route('/create'),
-            'edit' => Pages\EditTldPricing::route('/{record}/edit'),
+            'index' => ListTldPricing::route('/'),
+            'create' => CreateTldPricing::route('/create'),
+            'edit' => EditTldPricing::route('/{record}/edit'),
         ];
     }
 }
