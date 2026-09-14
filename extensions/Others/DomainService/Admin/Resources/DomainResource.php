@@ -3,6 +3,7 @@
 namespace Paymenter\Extensions\Others\DomainService\Admin\Resources;
 
 use Filament\Actions\Action;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables\Columns\TextColumn;
@@ -86,6 +87,44 @@ class DomainResource extends Resource
                             };
                         } catch (Throwable $e) {
                             Notification::make()->title('Could not check transfer status')->body($e->getMessage())->danger()->send();
+                        }
+                    }),
+                Action::make('nameservers')
+                    ->label('Nameservers')
+                    ->icon('ri-server-line')
+                    ->visible(fn (Domain $record) => in_array($record->status, [Domain::STATUS_ACTIVE, Domain::STATUS_GRACE, Domain::STATUS_REDEMPTION], true))
+                    ->fillForm(fn (Domain $record) => array_combine(
+                        ['ns1', 'ns2', 'ns3', 'ns4', 'ns5'],
+                        array_pad(array_slice($record->nameservers ?? [], 0, 5), 5, ''),
+                    ))
+                    ->form([
+                        TextInput::make('ns1')->label('Nameserver 1')->placeholder('ns1.example.com'),
+                        TextInput::make('ns2')->label('Nameserver 2')->placeholder('ns2.example.com'),
+                        TextInput::make('ns3')->label('Nameserver 3')->placeholder('ns3.example.com'),
+                        TextInput::make('ns4')->label('Nameserver 4')->placeholder('ns4.example.com'),
+                        TextInput::make('ns5')->label('Nameserver 5')->placeholder('ns5.example.com'),
+                    ])
+                    ->action(function (Domain $record, array $data) {
+                        $values = array_values(array_filter(array_map('trim', [
+                            $data['ns1'] ?? '', $data['ns2'] ?? '', $data['ns3'] ?? '', $data['ns4'] ?? '', $data['ns5'] ?? '',
+                        ])));
+
+                        if (count($values) < 2) {
+                            Notification::make()->title('Enter at least two nameservers.')->danger()->send();
+
+                            return;
+                        }
+
+                        try {
+                            $record->driver()->saveNameservers($record, $values);
+                            $record->update(['nameservers' => $values]);
+                            Notification::make()
+                                ->title('Nameservers updated.')
+                                ->body('Changes can take a few hours to spread across the internet.')
+                                ->success()
+                                ->send();
+                        } catch (Throwable $e) {
+                            Notification::make()->title('Could not update nameservers')->body($e->getMessage())->danger()->send();
                         }
                     }),
                 Action::make('forceActive')
