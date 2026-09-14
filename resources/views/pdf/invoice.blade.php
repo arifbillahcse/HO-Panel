@@ -140,6 +140,19 @@
     @if($invoice->number)
     <p>{{ __('invoices.invoice_no') }}: <strong>{{ $invoice->number }}</strong></p>
     @endif
+    @php
+        // Coupons are stored on the Service each line item bills, not on the
+        // invoice itself — a hosting order applies one coupon to every
+        // service it creates, so any one of them tells us what was used.
+        $appliedCoupon = $invoice->items
+            ->map(fn ($item) => $item->reference instanceof \App\Models\Service ? $item->reference->coupon : null)
+            ->filter()
+            ->unique('id')
+            ->first();
+    @endphp
+    @if($appliedCoupon)
+    <p>Coupon applied: <strong>{{ $appliedCoupon->code }}</strong></p>
+    @endif
 
     <table style="margin-top: 40px;" class="invoice-items">
         <thead>
