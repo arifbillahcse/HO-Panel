@@ -14,6 +14,18 @@ use Illuminate\Support\Facades\Session;
 
 class Cart
 {
+    /**
+     * The current request's cart, memoized manually rather than via the
+     * once() helper: once() caches by call site for the whole request, so a
+     * read earlier in the request (e.g. validateCoupon() checking product
+     * restrictions) would otherwise keep being served after a later write
+     * (applyCoupon() saving the coupon) — the coupon totals up correctly in
+     * the database but the same request's own re-render still shows the old
+     * total until a fresh request re-fetches it. Every method that changes
+     * the cart calls forgetCache() so the next get() re-fetches instead.
+     */
+    protected static ?\App\Models\Cart $cachedCart = null;
+
     public static function getOnce()
     {
         if (!Cookie::has('cart') || !$cart = \App\Models\Cart::where('ulid', Cookie::get('cart'))->first()) {
@@ -25,7 +37,12 @@ class Cart
 
     public static function get()
     {
-        return once(fn () => self::getOnce());
+        return self::$cachedCart ??= self::getOnce();
+    }
+
+    protected static function forgetCache(): void
+    {
+        self::$cachedCart = null;
     }
 
     public static function clear()
@@ -34,6 +51,7 @@ class Cart
             \App\Models\Cart::where('ulid', Cookie::get('cart'))->delete();
             Cookie::queue(Cookie::forget('cart'));
         }
+        self::forgetCache();
     }
 
     public static function items()
@@ -51,6 +69,8 @@ class Cart
             Cookie::queue('cart', $cart->ulid, 60 * 24 * 30); // 30 days
             $cart = \App\Models\Cart::find($cart->id);
         }
+
+        self::forgetCache();
 
         return $cart;
     }
@@ -96,6 +116,8 @@ class Cart
             }
         }
 
+        self::forgetCache();
+
         // Return index of the newly added item
         return $item->id;
     }
@@ -139,6 +161,7 @@ class Cart
             $item->delete(); // We also want to trigger Eloquent events
         }
         $cart->load('items.plan', 'items.product', 'items.product.configOptions.children.plans.prices');
+        self::forgetCache();
     }
 
     public static function updateQuantity($index, $quantity)
@@ -161,6 +184,7 @@ class Cart
         $item->save();
 
         $cart->load('items');
+        self::forgetCache();
     }
 
     /**
@@ -234,11 +258,13 @@ class Cart
 
         if ($wasSuccessful) {
             $cart->save();
+            self::forgetCache();
 
             return $cart;
         } else {
             $cart->coupon_id = null;
             $cart->save();
+            self::forgetCache();
             throw new DisplayException('Coupon code is not valid for any items in your cart');
         }
     }
@@ -271,5 +297,6 @@ class Cart
     {
         self::get()->update(['coupon_id' => null]);
         self::get()->load('coupon');
+        self::forgetCache();
     }
 }
