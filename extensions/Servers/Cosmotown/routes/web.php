@@ -13,13 +13,17 @@ if (\Paymenter\Extensions\Servers\Cosmotown\Cosmotown::DOMAINS_ENABLED) {
     });
 }
 
-Route::group(['middleware' => ['web', 'auth']], function () {
-    Route::get('/domains/manage', Domains\Index::class)
-        ->name('cosmotown.domains');
+// Retired alongside the purchase feature so the /domains paths are free for
+// the DomainService module. Existing Cosmotown services are unaffected.
+if (\Paymenter\Extensions\Servers\Cosmotown\Cosmotown::DOMAINS_ENABLED) {
+    Route::group(['middleware' => ['web', 'auth']], function () {
+        Route::get('/domains/manage', Domains\Index::class)
+            ->name('cosmotown.domains');
 
-    // can:view,service reuses ServicePolicy, so one customer cannot open
-    // another's domain by guessing the id.
-    Route::get('/domains/manage/{service}', Domains\Show::class)
-        ->name('cosmotown.domains.show')
-        ->middleware('can:view,service');
-});
+        // can:view,service reuses ServicePolicy, so one customer cannot open
+        // another's domain by guessing the id.
+        Route::get('/domains/manage/{service}', Domains\Show::class)
+            ->name('cosmotown.domains.show')
+            ->middleware('can:view,service');
+    });
+}

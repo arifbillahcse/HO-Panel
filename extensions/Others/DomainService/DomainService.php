@@ -7,7 +7,12 @@ use App\Classes\Extension\Extension;
 use App\Events\Invoice\Paid;
 use App\Helpers\ExtensionHelper;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schedule;
+use Illuminate\Support\Facades\View;
+use Livewire\Livewire;
+use Paymenter\Extensions\Others\DomainService\Livewire\Domains;
+use Paymenter\Extensions\Others\DomainService\Livewire\Search;
 use Paymenter\Extensions\Others\DomainService\Jobs\ProvisionDomainJob;
 use Paymenter\Extensions\Others\DomainService\Models\DomainInvoice;
 use Paymenter\Extensions\Others\DomainService\Services\DomainRenewalService;
@@ -41,6 +46,30 @@ class DomainService extends Extension
 
     public function boot()
     {
+        // Customer-facing routes, views and components.
+        require __DIR__ . '/routes/web.php';
+        View::addNamespace('domainservice', __DIR__ . '/resources/views');
+        Livewire::component('domainservice.search', Search::class);
+        Livewire::component('domainservice.domains.index', Domains\Index::class);
+        Livewire::component('domainservice.domains.show', Domains\Show::class);
+
+        // Domains in the storefront nav beside Shop.
+        Event::listen('navigation', fn () => [
+            'name' => 'Domains',
+            'url' => route('domainservice.search'),
+            'icon' => 'ri-global',
+            'priority' => 20,
+        ]);
+
+        // And in the client sidebar.
+        Event::listen('navigation.dashboard', fn () => [
+            'name' => 'Domains',
+            'url' => route('domainservice.domains'),
+            'icon' => 'ri-global',
+            'condition' => Auth::check(),
+            'priority' => 25,
+        ]);
+
         // Admin authorization. The Filament resources under Admin/Resources are
         // discovered by the panel automatically; these policies gate them.
         Gate::policy(DomainRegistrar::class, DomainRegistrarPolicy::class);
