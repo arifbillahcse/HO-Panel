@@ -83,6 +83,72 @@ class DomainOrderService
         });
     }
 
+    /**
+     * Turn an inbound transfer request into a payable invoice.
+     *
+     * @return Invoice  The unpaid invoice to send the customer to.
+     */
+    public function transfer(User $user, string $name, string $currency, string $authCode, int $years = 1): Invoice
+    {
+        $name = strtolower(trim($name));
+        $currency = strtoupper($currency);
+        $authCode = trim($authCode);
+
+        if (!preg_match('/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/', $name)) {
+            throw new DisplayException('That is not a valid domain name.');
+        }
+
+        if ($authCode === '') {
+            throw new DisplayException('An authorisation (EPP) code is required to transfer a domain.');
+        }
+
+        [$sld, $tldName] = $this->split($name);
+        $tld = $this->tld($tldName);
+        $pricing = $this->pricing($tld, $currency);
+
+        if (Domain::where('name', $name)->where('status', '!=', Domain::STATUS_CANCELLED)->exists()) {
+            throw new DisplayException("The domain {$name} is already in our system.");
+        }
+
+        return DB::transaction(function () use ($user, $name, $sld, $tldName, $tld, $pricing, $currency, $authCode, $years) {
+            $domain = Domain::create([
+                'user_id' => $user->id,
+                'registrar_id' => $tld->registrar_id,
+                'name' => $name,
+                'sld' => $sld,
+                'tld' => $tldName,
+                'currency' => $currency,
+                'auth_code' => $authCode,
+                'status' => Domain::STATUS_TRANSFER_PENDING,
+                'autorenew' => true,
+            ]);
+
+            $invoice = Invoice::create([
+                'user_id' => $user->id,
+                'currency_code' => $currency,
+                'due_at' => now()->addDays(7),
+                'status' => 'pending',
+            ]);
+
+            $invoice->items()->create([
+                'reference_id' => $domain->id,
+                'reference_type' => Domain::class,
+                'price' => round((float) $pricing->transfer_price, 2),
+                'quantity' => 1,
+                'description' => "Domain transfer: {$name}",
+            ]);
+
+            DomainInvoice::create([
+                'invoice_id' => $invoice->id,
+                'domain_id' => $domain->id,
+                'action' => DomainInvoice::ACTION_TRANSFER,
+                'years' => max(1, $years),
+            ]);
+
+            return $invoice;
+        });
+    }
+
     /** @return array{0: string, 1: string}  [sld, tld] */
     private function split(string $name): array
     {

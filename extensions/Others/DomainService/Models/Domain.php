@@ -15,12 +15,13 @@ class Domain extends Model
     public const STATUS_CANCELLED = 'cancelled';
 
     protected $fillable = [
-        'user_id', 'registrar_id', 'name', 'sld', 'tld', 'currency', 'status',
+        'user_id', 'registrar_id', 'name', 'sld', 'tld', 'currency', 'auth_code', 'status',
         'registered_at', 'expires_at', 'nameservers', 'locked', 'privacy', 'autorenew',
     ];
 
     protected $casts = [
         'nameservers' => 'array',
+        'auth_code' => 'encrypted',
         'registered_at' => 'datetime',
         'expires_at' => 'datetime',
         'locked' => 'boolean',

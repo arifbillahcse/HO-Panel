@@ -59,7 +59,16 @@ class ProvisionDomainJob implements ShouldQueue
                     $driver->sync($domain); // pulls the new expiry from the registrar
                     break;
 
-                // transfer wired in Phase 2
+                case DomainInvoice::ACTION_TRANSFER:
+                    // Submit the transfer once. The auth code's presence marks
+                    // "not yet submitted", so a retry after submission does not
+                    // resubmit; the status sweep completes it later.
+                    if ($domain->status === Domain::STATUS_TRANSFER_PENDING && filled($domain->auth_code)) {
+                        $driver->transfer($domain, (string) $domain->auth_code, $years);
+                        // Single-use and worthless once submitted — do not keep it.
+                        $domain->update(['auth_code' => null]);
+                    }
+                    break;
             }
 
             $link->update(['processed' => true]);

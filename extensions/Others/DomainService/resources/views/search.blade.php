@@ -14,6 +14,11 @@
                 <span wire:loading wire:target="search">Searching…</span>
             </button>
         </form>
+
+        <p class="text-sm text-base/60 mt-4">
+            Already own a domain?
+            <a href="{{ route('domainservice.transfer') }}" wire:navigate class="text-primary font-semibold hover:text-primary/80">Transfer it to us</a>.
+        </p>
     </div>
 
     @if ($notice)

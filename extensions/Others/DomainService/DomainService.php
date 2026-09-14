@@ -13,9 +13,11 @@ use Illuminate\Support\Facades\View;
 use Livewire\Livewire;
 use Paymenter\Extensions\Others\DomainService\Livewire\Domains;
 use Paymenter\Extensions\Others\DomainService\Livewire\Search;
+use Paymenter\Extensions\Others\DomainService\Livewire\Transfer;
 use Paymenter\Extensions\Others\DomainService\Jobs\ProvisionDomainJob;
 use Paymenter\Extensions\Others\DomainService\Models\DomainInvoice;
 use Paymenter\Extensions\Others\DomainService\Services\DomainRenewalService;
+use Paymenter\Extensions\Others\DomainService\Services\TransferPollService;
 use Illuminate\Support\Facades\Gate;
 use Paymenter\Extensions\Others\DomainService\Models\Domain;
 use Paymenter\Extensions\Others\DomainService\Models\DomainRegistrar;
@@ -50,6 +52,7 @@ class DomainService extends Extension
         require __DIR__ . '/routes/web.php';
         View::addNamespace('domainservice', __DIR__ . '/resources/views');
         Livewire::component('domainservice.search', Search::class);
+        Livewire::component('domainservice.transfer', Transfer::class);
         Livewire::component('domainservice.domains.index', Domains\Index::class);
         Livewire::component('domainservice.domains.show', Domains\Show::class);
 
@@ -97,6 +100,12 @@ class DomainService extends Extension
             Schedule::call(fn () => (new DomainRenewalService)->sweep())
                 ->name('domainservice-renewals')
                 ->daily()
+                ->withoutOverlapping();
+
+            // Inbound transfers complete at the registry with no callback, so poll.
+            Schedule::call(fn () => (new TransferPollService)->sweep())
+                ->name('domainservice-transfers')
+                ->hourly()
                 ->withoutOverlapping();
         }
 

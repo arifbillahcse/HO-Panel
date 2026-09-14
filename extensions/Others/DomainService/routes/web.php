@@ -3,10 +3,12 @@
 use Illuminate\Support\Facades\Route;
 use Paymenter\Extensions\Others\DomainService\Livewire\Domains;
 use Paymenter\Extensions\Others\DomainService\Livewire\Search;
+use Paymenter\Extensions\Others\DomainService\Livewire\Transfer;
 
 // Searching is public; the register action inside handles authentication.
 Route::group(['middleware' => ['web', 'checkout']], function () {
     Route::get('/domains', Search::class)->name('domainservice.search');
+    Route::get('/domains/transfer', Transfer::class)->name('domainservice.transfer');
 });
 
 Route::group(['middleware' => ['web', 'auth']], function () {
