@@ -5,6 +5,7 @@ namespace Paymenter\Extensions\Gateways\EPS;
 use App\Attributes\ExtensionMeta;
 use App\Classes\Extension\Gateway;
 use App\Enums\InvoiceTransactionStatus;
+use App\Exceptions\DisplayException;
 use App\Helpers\ExtensionHelper;
 use App\Models\Gateway as GatewayModel;
 use App\Models\Invoice;
@@ -154,7 +155,7 @@ class EPS extends Gateway
     public function pay(Invoice $invoice, $total)
     {
         if (strtoupper($invoice->currency_code) !== self::CURRENCY) {
-            throw new Exception('EPS can only accept payments in ' . self::CURRENCY . ', but this invoice is in ' . $invoice->currency_code . '.');
+            throw new DisplayException('EPS can only accept payments in ' . self::CURRENCY . ', but this invoice is in ' . $invoice->currency_code . '.');
         }
 
         $customer = $this->customer($invoice);
@@ -220,7 +221,7 @@ class EPS extends Gateway
             }
         }
 
-        throw new Exception('Could not allocate a unique EPS transaction reference. Please try again.');
+        throw new DisplayException('Could not start the payment just now. Please try again.');
     }
 
     /**
@@ -439,7 +440,7 @@ class EPS extends Gateway
         ));
 
         if ($missing) {
-            throw new Exception('EPS needs your ' . implode(', ', $missing) . ' before it can take a payment. Please complete your profile and try again.');
+            throw new DisplayException('Please add your ' . implode(', ', $missing) . ' to your account details before paying with EPS — EPS requires them for every transaction.');
         }
 
         return $customer;
