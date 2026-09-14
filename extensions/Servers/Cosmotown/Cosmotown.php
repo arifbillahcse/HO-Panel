@@ -51,6 +51,15 @@ class Cosmotown extends Server
     /** pending | complete | failed — only set on transfer orders. */
     private const TRANSFER_KEY = 'cosmotown_transfer_status';
 
+    /**
+     * Master switch for the customer-facing domain purchase feature. Turned
+     * off while a registrar-agnostic domain module is built to replace it: the
+     * storefront and client "Domains" menus and the public search route are
+     * not registered, so no new domain can be bought. Existing data is left
+     * untouched. Flip to true to restore the old flow.
+     */
+    public const DOMAINS_ENABLED = false;
+
     public function boot()
     {
         require __DIR__ . '/routes/web.php';
@@ -61,26 +70,28 @@ class Cosmotown extends Server
         Livewire::component('cosmotown-domains-index', Domains\Index::class);
         Livewire::component('cosmotown-domains-show', Domains\Show::class);
 
-        // Put Domains in the storefront nav beside Shop.
-        Event::listen('navigation', function () {
-            return [
-                'name' => 'Domains',
-                'url' => route('cosmotown.search'),
-                'icon' => 'ri-global',
-                'priority' => 20,
-            ];
-        });
+        if (self::DOMAINS_ENABLED) {
+            // Put Domains in the storefront nav beside Shop.
+            Event::listen('navigation', function () {
+                return [
+                    'name' => 'Domains',
+                    'url' => route('cosmotown.search'),
+                    'icon' => 'ri-global',
+                    'priority' => 20,
+                ];
+            });
 
-        // And in the client sidebar, between Services (20) and Invoices (30).
-        Event::listen('navigation.dashboard', function () {
-            return [
-                'name' => 'Domains',
-                'url' => route('cosmotown.domains'),
-                'icon' => 'ri-global',
-                'condition' => Auth::check(),
-                'priority' => 25,
-            ];
-        });
+            // And in the client sidebar, between Services (20) and Invoices (30).
+            Event::listen('navigation.dashboard', function () {
+                return [
+                    'name' => 'Domains',
+                    'url' => route('cosmotown.domains'),
+                    'icon' => 'ri-global',
+                    'condition' => Auth::check(),
+                    'priority' => 25,
+                ];
+            });
+        }
 
         // Transfers finish at the registry hours or days after they start and
         // Cosmotown sends no callback, so poll. Console-only: boot() also runs
