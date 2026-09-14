@@ -17,6 +17,7 @@
         @php
             $name = $service->properties->firstWhere('key', 'domain')?->value;
             $registered = $service->properties->contains('key', 'cosmotown_registered_at');
+            $transfer = $service->properties->firstWhere('key', 'cosmotown_transfer_status')?->value;
         @endphp
 
         <div class="card p-5 mt-4 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
@@ -56,9 +57,15 @@
                     </span>
                 </div>
 
-                @unless ($registered)
+                @if ($transfer === 'pending')
+                    <p class="text-sm text-warning mt-2.5">
+                        Transfer in progress — usually 5 to 7 days. Your current registrar may email you to approve it.
+                    </p>
+                @elseif ($transfer === 'failed')
+                    <p class="text-sm text-error mt-2.5">Transfer could not be completed. We've been notified.</p>
+                @elseif (!$registered)
                     <p class="text-sm text-warning mt-2.5">Registration has not completed yet.</p>
-                @endunless
+                @endif
             </div>
 
             <div class="flex flex-wrap items-center gap-3 shrink-0">
