@@ -73,6 +73,56 @@ class CosmotownApi
         ]);
     }
 
+    /**
+     * Start an inbound transfer.
+     *
+     * The auth code is base64 encoded because Cosmotown expects it that way —
+     * sending it raw is accepted and then fails silently at the registry.
+     *
+     * @param  array  $domains  ['example.com' => 'EPP-CODE']
+     */
+    public function transferDomains(array $domains): array
+    {
+        $items = [];
+
+        foreach ($domains as $name => $authCode) {
+            $items[] = [
+                'name' => $name,
+                'authCode' => base64_encode((string) $authCode),
+            ];
+        }
+
+        return $this->post('transferdomains', ['items' => $items]);
+    }
+
+    /**
+     * Progress of one or more in-flight transfers.
+     *
+     * @param  array<string>  $domains
+     * @return array<string, array{status: string, message: ?string}>
+     */
+    public function domainStatus(array $domains): array
+    {
+        $response = $this->post('domainstatus', ['domains' => array_values($domains)]);
+
+        $statuses = [];
+
+        // The payload is a bare list of per-domain results rather than an
+        // object, so walk it instead of indexing by domain.
+        foreach ($response as $row) {
+            if (!is_array($row) || empty($row['domain'])) {
+                continue;
+            }
+
+            $statuses[strtolower($row['domain'])] = [
+                'status' => (string) ($row['registration_status'] ?? ''),
+                'message' => $row['message'] ?? null,
+            ];
+        }
+
+        return $statuses;
+    }
+
     public function saveNameservers(string $domain, array $nameservers): array
     {
         return $this->post('savedomainnameservers', [

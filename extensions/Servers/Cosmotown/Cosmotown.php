@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\View;
 use Livewire\Livewire;
 use Paymenter\Extensions\Servers\Cosmotown\Livewire\Domains;
@@ -40,6 +41,11 @@ class Cosmotown extends Server
 
     /** Invoice id of the last renewal actually sent to Cosmotown. */
     private const LAST_RENEWAL_KEY = 'cosmotown_last_renewal_invoice';
+
+    private const AUTH_CODE_KEY = 'auth_code';
+
+    /** pending | complete | failed — only set on transfer orders. */
+    private const TRANSFER_KEY = 'cosmotown_transfer_status';
 
     public function boot()
     {
@@ -71,6 +77,25 @@ class Cosmotown extends Server
                 'priority' => 25,
             ];
         });
+
+        // Transfers finish at the registry hours or days after they start and
+        // Cosmotown sends no callback, so poll. Console-only: boot() also runs
+        // on web requests, where registering a schedule is pure overhead.
+        if (app()->runningInConsole()) {
+            Schedule::call(function () {
+                Service::query()
+                    ->whereHas('product.server', fn ($query) => $query->where('extension', 'Cosmotown'))
+                    ->whereHas('properties', fn ($query) => $query
+                        ->where('key', self::TRANSFER_KEY)
+                        ->where('value', 'pending'))
+                    ->get()
+                    ->each(fn (Service $service) => ExtensionHelper::callService(
+                        $service,
+                        'checkTransfer',
+                        mayFail: true,
+                    ));
+            })->name('cosmotown-transfer-poll')->hourly()->withoutOverlapping();
+        }
 
         Event::listen(Paid::class, function (Paid $event) {
             foreach ($event->invoice->items as $item) {
@@ -133,6 +158,18 @@ class Cosmotown extends Server
     {
         return [
             [
+                'name' => 'mode',
+                'type' => 'select',
+                'label' => 'Order type',
+                'description' => 'Registration takes a new domain. Transfer moves one in from another registrar and asks the customer for an auth code.',
+                'options' => [
+                    ['value' => 'register', 'label' => 'Registration'],
+                    ['value' => 'transfer', 'label' => 'Transfer in'],
+                ],
+                'default' => 'register',
+                'required' => true,
+            ],
+            [
                 'name' => 'years',
                 'type' => 'number',
                 'label' => 'Registration period (years)',
@@ -153,7 +190,7 @@ class Cosmotown extends Server
 
     public function getCheckoutConfig($product = null, $values = [], $settings = []): array
     {
-        return [
+        $fields = [
             [
                 'name' => self::DOMAIN_KEY,
                 'type' => 'text',
@@ -163,12 +200,30 @@ class Cosmotown extends Server
                 'required' => true,
             ],
         ];
+
+        if (($settings['mode'] ?? 'register') === 'transfer') {
+            $fields[] = [
+                'name' => self::AUTH_CODE_KEY,
+                'type' => 'text',
+                'label' => 'Authorisation code',
+                'description' => 'Also called an EPP or transfer code. Get it from your current registrar, and make sure the domain is unlocked there.',
+                'placeholder' => 'ABC123-xyz',
+                'validation' => 'required|string|max:255',
+                'required' => true,
+            ];
+        }
+
+        return $fields;
     }
 
     public function createServer(Service $service, $settings, $properties)
     {
         $domain = $this->domain($properties);
         $years = max(1, (int) ($settings['years'] ?? 1));
+
+        if (($settings['mode'] ?? 'register') === 'transfer') {
+            return $this->startTransfer($service, $domain, $properties);
+        }
 
         $this->api()->registerDomains([$domain => $years]);
 
@@ -230,6 +285,20 @@ class Cosmotown extends Server
 
     public function getActions(Service $service, $settings, $properties): array
     {
+        // A transfer that has not landed yet is not ours to manage, and asking
+        // Cosmotown about it would just error. Report progress instead.
+        $transfer = $properties[self::TRANSFER_KEY] ?? null;
+
+        if ($transfer === 'pending' || $transfer === 'failed') {
+            return [[
+                'type' => 'text',
+                'label' => 'Transfer',
+                'text' => $transfer === 'pending'
+                    ? 'In progress. Transfers usually take 5 to 7 days, and your current registrar may email you to approve it.'
+                    : 'Could not be completed. We have been notified and will be in touch.',
+            ]];
+        }
+
         if (!isset($properties[self::REGISTERED_KEY])) {
             return [];
         }
@@ -316,6 +385,123 @@ class Cosmotown extends Server
         Cache::forget($this->infoCacheKey($domain));
 
         return route('services.show', $service);
+    }
+
+    /**
+     * Transfers complete at the registry days later, so this only starts one.
+     * checkTransfer() below finishes the job when Cosmotown reports COMPLETE.
+     */
+    private function startTransfer(Service $service, string $domain, array $properties): bool
+    {
+        $authCode = $properties[self::AUTH_CODE_KEY] ?? null;
+
+        if (!$authCode) {
+            throw new Exception('No authorisation code was supplied for this transfer.');
+        }
+
+        $this->api()->transferDomains([$domain => $authCode]);
+
+        $service->properties()->updateOrCreate(
+            ['key' => self::TRANSFER_KEY],
+            ['name' => 'Transfer status', 'value' => 'pending'],
+        );
+
+        // The auth code is single use and worthless once the transfer starts,
+        // so do not keep it sitting in the database.
+        $service->properties()->where('key', self::AUTH_CODE_KEY)->delete();
+
+        return true;
+    }
+
+    /**
+     * Poll one in-flight transfer. Scheduled hourly, and safe to call again.
+     */
+    public function checkTransfer(Service $service, $settings, $properties): void
+    {
+        if (($properties[self::TRANSFER_KEY] ?? null) !== 'pending') {
+            return;
+        }
+
+        $domain = $this->domain($properties);
+
+        try {
+            $statuses = $this->api()->domainStatus([$domain]);
+        } catch (Exception $e) {
+            // A registrar that is briefly unreachable is not a failed
+            // transfer; leave it pending and try again next hour.
+            Log::warning("Cosmotown: could not check transfer for {$domain}: " . $e->getMessage());
+
+            return;
+        }
+
+        $result = $statuses[$domain] ?? null;
+
+        if (!$result) {
+            return;
+        }
+
+        if (strtoupper($result['status']) === 'COMPLETE') {
+            $this->completeTransfer($service, $domain, $settings);
+
+            return;
+        }
+
+        // Cosmotown only sends a message when something is wrong; progress
+        // updates come back with an empty one.
+        if (!empty($result['message'])) {
+            $this->failTransfer($service, $domain, (string) $result['message']);
+        }
+    }
+
+    private function completeTransfer(Service $service, string $domain, $settings): void
+    {
+        $service->properties()->updateOrCreate(
+            ['key' => self::TRANSFER_KEY],
+            ['name' => 'Transfer status', 'value' => 'complete'],
+        );
+
+        // Registered marks the domain as ours to manage, which unlocks the
+        // nameserver editor and the lock and privacy controls.
+        $service->properties()->updateOrCreate(
+            ['key' => self::REGISTERED_KEY],
+            ['name' => 'Registered at', 'value' => now()->toDateTimeString()],
+        );
+
+        if ($nameservers = $this->configuredNameservers($settings)) {
+            try {
+                $this->api()->saveNameservers($domain, $nameservers);
+            } catch (Exception $e) {
+                Log::warning("Cosmotown: transferred {$domain} but could not set nameservers: " . $e->getMessage());
+            }
+        }
+
+        Cache::forget($this->infoCacheKey($domain));
+
+        NotificationHelper::sendSystemEmailNotification(
+            "Domain transfer completed: {$domain}",
+            "The inbound transfer of {$domain} (service #{$service->id}) has completed.",
+        );
+    }
+
+    private function failTransfer(Service $service, string $domain, string $reason): void
+    {
+        $service->properties()->updateOrCreate(
+            ['key' => self::TRANSFER_KEY],
+            ['name' => 'Transfer status', 'value' => 'failed'],
+        );
+
+        $message = "The inbound transfer of {$domain} (service #{$service->id}) failed.\n\n"
+            . "Reason: {$reason}\n\n"
+            . 'The customer has paid and holds nothing. Usually the domain is locked at the losing '
+            . 'registrar, the auth code is wrong, or it was registered less than 60 days ago. '
+            . 'Contact them, then restart the transfer once it is resolved.';
+
+        Log::error($message);
+
+        NotificationHelper::sendSystemEmailNotification(
+            "Domain transfer FAILED: {$domain}",
+            $message,
+        );
     }
 
     /**

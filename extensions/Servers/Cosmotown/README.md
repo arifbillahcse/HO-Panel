@@ -14,7 +14,7 @@ Registers and renews domain names through the Cosmotown reseller API.
 | Nameserver editing | yes, in the client area |
 | Availability search | yes, at `/domains` |
 | Client-area domain list | yes, at `/domains/manage` |
-| Transfers | no — planned |
+| Transfers in | yes, with status polling |
 | EPP codes | no — endpoint unverified |
 | WHOIS contact edits | no — endpoint unverified |
 | Child nameservers | no — Cosmotown exposes no endpoint |
@@ -93,6 +93,30 @@ fields that would look like a domain with no nameservers.
 
 Billing for a domain stays on the normal service page — the Domains pages
 handle the registrar side only.
+
+## Transfers
+
+Set a product's **Order type** to *Transfer in* and checkout asks for the
+authorisation (EPP) code alongside the domain. The code is used once to start
+the transfer and then deleted — it is worthless afterwards and should not sit
+in your database.
+
+Transfers do not complete immediately. Cosmotown sends no callback, so the
+extension polls `domainstatus` **hourly** and finishes the job when the
+registry reports COMPLETE: the domain becomes manageable, your default
+nameservers are applied, and you get an email.
+
+A failure also emails you, with the reason. That matters because the customer
+has paid and holds nothing — usually the domain is locked at the losing
+registrar, the auth code is wrong, or it was registered under 60 days ago.
+
+Polling needs the Paymenter scheduler cron to be installed:
+
+```
+* * * * * cd /path/to/paymenter && php artisan schedule:run >> /dev/null 2>&1
+```
+
+Without it, transfers will start but never be marked complete.
 
 ## How renewal works
 

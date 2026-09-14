@@ -1,5 +1,6 @@
 @php
     $name = $service->properties->firstWhere('key', 'domain')?->value ?? $service->label;
+    $transfer = $service->properties->firstWhere('key', 'cosmotown_transfer_status')?->value;
 @endphp
 
 <div class="container mt-14">
@@ -18,6 +19,28 @@
             <div>
                 <p class="font-semibold">We can't reach the registrar right now</p>
                 <p class="text-sm text-base/60 mt-0.5">Your domain is unaffected. Try again in a few minutes.</p>
+            </div>
+        </div>
+    @elseif ($transfer === 'pending')
+        <div class="mt-8 flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 p-4">
+            <x-ri-error-warning-fill class="size-5 text-warning shrink-0 mt-0.5" />
+            <div>
+                <p class="font-semibold">Transfer in progress</p>
+                <p class="text-sm text-base/60 mt-0.5">
+                    Transfers usually take 5 to 7 days. Your current registrar may email you to approve it —
+                    approving speeds things up. Management options appear here once it lands.
+                </p>
+            </div>
+        </div>
+    @elseif ($transfer === 'failed')
+        <div class="mt-8 flex items-start gap-3 rounded-lg border border-error/30 bg-error/10 p-4">
+            <x-ri-error-warning-fill class="size-5 text-error shrink-0 mt-0.5" />
+            <div>
+                <p class="font-semibold">Transfer could not be completed</p>
+                <p class="text-sm text-base/60 mt-0.5">
+                    We've been notified and will contact you. This usually means the domain is locked at your
+                    current registrar, the authorisation code was wrong, or it was registered within the last 60 days.
+                </p>
             </div>
         </div>
     @elseif (!$details)
