@@ -41,6 +41,7 @@ class ResellerClubDriver implements RegistrarDriver
             'transfer' => true,
             'eppRetrieval' => true,   // details-by-name returns the auth code
             'dns' => true,
+            'dnsRecords' => true,     // LogicBoxes' separate DNS Management product.
             'privacy' => true,
             'lock' => true,
             'autoRenew' => false,
@@ -176,6 +177,33 @@ class ResellerClubDriver implements RegistrarDriver
         $details = $this->api->detailsByName($domain->name);
 
         return $details['domsecret'] ?? null;
+    }
+
+    // ---- DNS zone records --------------------------------------------
+    // Requires LogicBoxes' DNS Management product to be enabled on the
+    // account — a separate product from domain reseller. See
+    // Support/ResellerClubApi for the endpoint caveat.
+
+    public function getDnsRecords(Domain $domain): array
+    {
+        $records = $this->api->searchDnsRecords($domain->name);
+
+        return array_map(fn ($r) => [
+            'type' => (string) ($r['type'] ?? ''),
+            'host' => (string) ($r['name'] ?? $r['host'] ?? ''),
+            'value' => (string) ($r['value'] ?? ''),
+            'ttl' => (int) ($r['timetolive'] ?? $r['ttl'] ?? 3600),
+        ], $records);
+    }
+
+    public function addDnsRecord(Domain $domain, array $record): void
+    {
+        $this->api->addDnsRecord($domain->name, $record);
+    }
+
+    public function deleteDnsRecord(Domain $domain, array $record): void
+    {
+        $this->api->deleteDnsRecord($domain->name, $record);
     }
 
     // ---- ResellerClub-specific plumbing, private to this driver ----------

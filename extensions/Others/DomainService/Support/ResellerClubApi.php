@@ -166,6 +166,77 @@ class ResellerClubApi
         return true;
     }
 
+    // ---- DNS zone records --------------------------------------------
+    // LogicBoxes' DNS Management product is a separate API from domain
+    // reseller — it must be enabled on the account and used through its own
+    // "dns/" endpoints. Shapes below follow the documented DNS Management
+    // API; verify against current docs and OT&E before live use, same as the
+    // rest of this client.
+
+    /** @return array<int, array<string, mixed>> */
+    public function searchDnsRecords(string $domain): array
+    {
+        $response = $this->get('dns/manage/search-records.json', [
+            'domain-name' => $domain,
+            'type' => 'All',
+            'no-of-records' => 500,
+            'page-no' => 1,
+        ]);
+
+        $records = $response['records'] ?? $response;
+
+        return is_array($records) ? array_values($records) : [];
+    }
+
+    /** @param  array{type: string, host: string, value: string, ttl?: int}  $record */
+    public function addDnsRecord(string $domain, array $record): array
+    {
+        $type = strtoupper($record['type']);
+        $endpoint = match ($type) {
+            'A' => 'dns/manage/add-ipv4-record.json',
+            'AAAA' => 'dns/manage/add-ipv6-record.json',
+            'CNAME' => 'dns/manage/add-cname-record.json',
+            'MX' => 'dns/manage/add-mx-record.json',
+            'TXT' => 'dns/manage/add-txt-record.json',
+            'NS' => 'dns/manage/add-ns-record.json',
+            default => throw new Exception("Unsupported DNS record type: {$type}"),
+        };
+
+        $params = [
+            'domain-name' => $domain,
+            'host' => $record['host'],
+            'value' => $record['value'],
+            'ttl' => $record['ttl'] ?? 3600,
+        ];
+
+        if ($type === 'MX') {
+            $params['priority'] = $record['priority'] ?? 10;
+        }
+
+        return (array) $this->get($endpoint, $params);
+    }
+
+    /** @param  array{type: string, host: string, value: string}  $record */
+    public function deleteDnsRecord(string $domain, array $record): void
+    {
+        $type = strtoupper($record['type']);
+        $endpoint = match ($type) {
+            'A' => 'dns/manage/delete-ipv4-record.json',
+            'AAAA' => 'dns/manage/delete-ipv6-record.json',
+            'CNAME' => 'dns/manage/delete-cname-record.json',
+            'MX' => 'dns/manage/delete-mx-record.json',
+            'TXT' => 'dns/manage/delete-txt-record.json',
+            'NS' => 'dns/manage/delete-ns-record.json',
+            default => throw new Exception("Unsupported DNS record type: {$type}"),
+        };
+
+        $this->get($endpoint, [
+            'domain-name' => $domain,
+            'host' => $record['host'],
+            'value' => $record['value'],
+        ]);
+    }
+
     /** @param  array<string>  $nameservers */
     private function nsParams(array $nameservers): array
     {

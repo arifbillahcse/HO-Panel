@@ -11,7 +11,8 @@ use Paymenter\Extensions\Others\DomainService\Models\DomainTld;
 use Throwable;
 
 /**
- * Raises renewal invoices before a domain expires.
+ * Raises renewal invoices before a domain expires, and recovery invoices for
+ * one that has already lapsed into grace or redemption.
  *
  * The sweep is chunked and index-backed (status + expires_at) so it stays flat
  * whether there are ten domains or a million. It only ever creates an invoice —
@@ -22,6 +23,8 @@ class DomainRenewalService
 {
     public function sweep(int $daysAhead = 14): void
     {
+        // Active domains approaching expiry, invoiced ahead of time at the
+        // normal renew price.
         Domain::query()
             ->where('status', Domain::STATUS_ACTIVE)
             ->where('autorenew', true)
@@ -33,6 +36,22 @@ class DomainRenewalService
                         $this->createRenewalInvoice($domain);
                     } catch (Throwable $e) {
                         Log::error("DomainService: could not raise renewal for {$domain->name}: " . $e->getMessage());
+                    }
+                }
+            });
+
+        // Grace and redemption domains are already past due — always due an
+        // invoice, whatever autorenew says, since the customer must act to
+        // keep the domain at all. ExpirySweepService is what puts a domain in
+        // either status; this only prices and invoices it.
+        Domain::query()
+            ->whereIn('status', [Domain::STATUS_GRACE, Domain::STATUS_REDEMPTION])
+            ->chunkById(200, function ($domains) {
+                foreach ($domains as $domain) {
+                    try {
+                        $this->createRenewalInvoice($domain);
+                    } catch (Throwable $e) {
+                        Log::error("DomainService: could not raise recovery invoice for {$domain->name}: " . $e->getMessage());
                     }
                 }
             });
@@ -62,7 +81,14 @@ class DomainRenewalService
             return null;
         }
 
-        return DB::transaction(function () use ($domain, $pricing, $years) {
+        $inRedemption = $domain->status === Domain::STATUS_REDEMPTION;
+        $unitPrice = $inRedemption ? $pricing->redemptionRenewPrice() : (float) $pricing->renew_price;
+
+        $description = $inRedemption
+            ? "Domain recovery: {$domain->name} — past due, includes a redemption fee ({$years} " . str('year')->plural($years) . ')'
+            : "Domain renewal: {$domain->name} ({$years} " . str('year')->plural($years) . ')';
+
+        return DB::transaction(function () use ($domain, $unitPrice, $years, $description) {
             $invoice = Invoice::create([
                 'user_id' => $domain->user_id,
                 'currency_code' => $domain->currency,
@@ -73,9 +99,9 @@ class DomainRenewalService
             $invoice->items()->create([
                 'reference_id' => $domain->id,
                 'reference_type' => Domain::class,
-                'price' => round($pricing->renew_price * $years, 2),
+                'price' => round($unitPrice * $years, 2),
                 'quantity' => 1,
-                'description' => "Domain renewal: {$domain->name} ({$years} " . str('year')->plural($years) . ')',
+                'description' => $description,
             ]);
 
             DomainInvoice::create([

@@ -69,10 +69,12 @@ class TldPricingResource extends Resource
                     TextInput::make('register_price')->numeric()->required()->default(0)->minValue(0),
                     TextInput::make('renew_price')->numeric()->required()->default(0)->minValue(0),
                     TextInput::make('transfer_price')->numeric()->required()->default(0)->minValue(0),
+                    TextInput::make('redemption_fee')->numeric()->required()->default(0)->minValue(0)
+                        ->helperText('Added on top of the renew price if a customer recovers the domain during redemption.'),
                 ])
                 ->columns(4)
                 ->addActionLabel('Add a currency')
-                ->helperText('Set register, renew and transfer for each currency you sell in.'),
+                ->helperText('Set register, renew, transfer and the redemption recovery fee for each currency you sell in.'),
         ]);
     }
 

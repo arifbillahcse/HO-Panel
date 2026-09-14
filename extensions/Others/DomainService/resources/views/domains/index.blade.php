@@ -19,9 +19,13 @@
                         <span class="inline-flex items-center gap-1.5 rounded-full bg-success/15 text-success text-xs font-semibold px-2.5 py-1">
                             <x-ri-checkbox-circle-fill class="size-3.5" /> Active
                         </span>
-                    @elseif (in_array($domain->status, ['pending', 'transfer_pending']))
+                    @elseif (in_array($domain->status, ['pending', 'transfer_pending', 'grace']))
                         <span class="inline-flex items-center gap-1.5 rounded-full bg-warning/15 text-warning text-xs font-semibold px-2.5 py-1">
-                            <x-ri-error-warning-fill class="size-3.5" /> {{ str($domain->status)->headline() }}
+                            <x-ri-error-warning-fill class="size-3.5" /> {{ $domain->status === 'grace' ? 'Expired — grace period' : str($domain->status)->headline() }}
+                        </span>
+                    @elseif ($domain->status === 'redemption')
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-error/15 text-error text-xs font-semibold px-2.5 py-1">
+                            <x-ri-error-warning-fill class="size-3.5" /> Redemption
                         </span>
                     @else
                         <span class="inline-flex items-center gap-1.5 rounded-full bg-inactive/15 text-inactive text-xs font-semibold px-2.5 py-1">
@@ -32,14 +36,14 @@
                 </div>
                 @if ($domain->expires_at)
                     <p class="text-sm text-base/60 mt-2.5">
-                        Renews {{ $domain->expires_at->format('M d, Y') }}
+                        {{ in_array($domain->status, ['grace', 'redemption']) ? 'Expired' : 'Renews' }} {{ $domain->expires_at->format('M d, Y') }}
                         <span class="text-base/40">({{ $domain->expires_at->diffForHumans() }})</span>
                     </p>
                 @endif
             </div>
 
             <div class="flex flex-wrap items-center gap-3 shrink-0">
-                @if ($domain->status === 'active')
+                @if (in_array($domain->status, ['active', 'grace', 'redemption']))
                     <a href="{{ route('domainservice.domains.show', $domain) }}" wire:navigate>
                         <span class="flex items-center gap-2 justify-center bg-primary text-white text-sm font-semibold hover:bg-primary/80 py-2.5 px-5 rounded-md duration-300 whitespace-nowrap">
                             <x-ri-settings-3-line class="size-4" /> Manage

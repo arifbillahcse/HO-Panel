@@ -17,6 +17,7 @@ use Paymenter\Extensions\Others\DomainService\Livewire\Transfer;
 use Paymenter\Extensions\Others\DomainService\Jobs\ProvisionDomainJob;
 use Paymenter\Extensions\Others\DomainService\Models\DomainInvoice;
 use Paymenter\Extensions\Others\DomainService\Services\DomainRenewalService;
+use Paymenter\Extensions\Others\DomainService\Services\ExpirySweepService;
 use Paymenter\Extensions\Others\DomainService\Services\TransferPollService;
 use Illuminate\Support\Facades\Gate;
 use Paymenter\Extensions\Others\DomainService\Models\Domain;
@@ -97,6 +98,15 @@ class DomainService extends Extension
         // Raise renewal invoices ahead of expiry. Console-only: boot() also
         // runs on web requests, where scheduling is pure overhead.
         if (app()->runningInConsole()) {
+            // Moves a lapsed domain from active into grace, then redemption,
+            // then lost — runs before the renewal sweep so a domain that
+            // crosses into redemption today is invoiced at the redemption
+            // price today, not a day late.
+            Schedule::call(fn () => (new ExpirySweepService)->sweep())
+                ->name('domainservice-expiry')
+                ->daily()
+                ->withoutOverlapping();
+
             Schedule::call(fn () => (new DomainRenewalService)->sweep())
                 ->name('domainservice-renewals')
                 ->daily()

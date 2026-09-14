@@ -23,7 +23,10 @@ interface RegistrarDriver
     /**
      * Feature flags the UI and lifecycle read before offering an action.
      *
-     * Keys: transfer, eppRetrieval, dns, privacy, lock, autoRenew — each bool.
+     * Keys: transfer, eppRetrieval, dns (nameserver management), dnsRecords
+     * (A/CNAME/MX/TXT zone record management — a separate, usually optional,
+     * registrar product from nameserver management), privacy, lock, autoRenew
+     * — each bool.
      *
      * @return array<string, bool>
      */
@@ -79,4 +82,18 @@ interface RegistrarDriver
      * registrar has no API for it (e.g. Cosmotown).
      */
     public function getEppCode(Domain $domain): ?string;
+
+    // ---- DNS zone records — declared now, wired in Phase 4 ----------------
+    // Gated by capabilities()['dnsRecords']; a driver without it may throw.
+
+    /**
+     * @return array<int, array{type: string, host: string, value: string, ttl: int}>
+     */
+    public function getDnsRecords(Domain $domain): array;
+
+    /** @param  array{type: string, host: string, value: string, ttl?: int}  $record */
+    public function addDnsRecord(Domain $domain, array $record): void;
+
+    /** @param  array{type: string, host: string, value: string}  $record */
+    public function deleteDnsRecord(Domain $domain, array $record): void;
 }

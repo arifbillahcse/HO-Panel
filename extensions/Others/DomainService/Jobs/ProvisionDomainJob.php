@@ -57,6 +57,13 @@ class ProvisionDomainJob implements ShouldQueue
                 case DomainInvoice::ACTION_RENEW:
                     $driver->renew($domain, $years);
                     $driver->sync($domain); // pulls the new expiry from the registrar
+
+                    // sync() only promotes STATUS_PENDING to active; a domain
+                    // paid back from grace or redemption needs it set directly,
+                    // since it was never pending.
+                    if (in_array($domain->fresh()->status, Domain::LAPSED_STATUSES, true)) {
+                        $domain->update(['status' => Domain::STATUS_ACTIVE]);
+                    }
                     break;
 
                 case DomainInvoice::ACTION_TRANSFER:

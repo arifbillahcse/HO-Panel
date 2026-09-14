@@ -9,10 +9,22 @@ class Domain extends Model
 {
     public const STATUS_PENDING = 'pending';
     public const STATUS_ACTIVE = 'active';
+
+    /** Past expiry, still within the TLD's grace_days — renews at the normal price. */
+    public const STATUS_GRACE = 'grace';
+
+    /** Past grace, within redemption_days — renews at the normal price plus the redemption fee. */
+    public const STATUS_REDEMPTION = 'redemption';
+
+    /** Past grace and redemption — lost at the registry; no longer renewable here. */
     public const STATUS_EXPIRED = 'expired';
+
     public const STATUS_TRANSFER_PENDING = 'transfer_pending';
     public const STATUS_TRANSFER_FAILED = 'transfer_failed';
     public const STATUS_CANCELLED = 'cancelled';
+
+    /** Statuses a customer can still act on — see a manage page, pay to keep the domain. */
+    public const LAPSED_STATUSES = [self::STATUS_GRACE, self::STATUS_REDEMPTION];
 
     protected $fillable = [
         'user_id', 'registrar_id', 'name', 'sld', 'tld', 'registrar_ref', 'currency', 'auth_code', 'status',

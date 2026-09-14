@@ -2,6 +2,7 @@
 
 namespace Paymenter\Extensions\Others\DomainService\Drivers;
 
+use Exception;
 use Paymenter\Extensions\Others\DomainService\Contracts\RegistrarDriver;
 use Paymenter\Extensions\Others\DomainService\Models\Domain;
 use Paymenter\Extensions\Others\DomainService\Support\CosmotownApi;
@@ -32,6 +33,7 @@ class CosmotownDriver implements RegistrarDriver
             'transfer' => true,
             'eppRetrieval' => false, // Cosmotown has no reseller API for this.
             'dns' => true,
+            'dnsRecords' => false,   // No zone/record API in the reseller product.
             'privacy' => true,
             'lock' => true,
             'autoRenew' => false,    // The module drives renewals, not the registrar.
@@ -149,5 +151,24 @@ class CosmotownDriver implements RegistrarDriver
         // fetch it by hand. capabilities()['eppRetrieval'] is false so the UI
         // never offers it.
         return null;
+    }
+
+    // ---- DNS zone records: not offered by Cosmotown's reseller API -------
+    // capabilities()['dnsRecords'] is false, so the UI never calls these; they
+    // throw rather than silently no-op if something ever does.
+
+    public function getDnsRecords(Domain $domain): array
+    {
+        throw new Exception('DNS record management is not available for domains at this registrar.');
+    }
+
+    public function addDnsRecord(Domain $domain, array $record): void
+    {
+        throw new Exception('DNS record management is not available for domains at this registrar.');
+    }
+
+    public function deleteDnsRecord(Domain $domain, array $record): void
+    {
+        throw new Exception('DNS record management is not available for domains at this registrar.');
     }
 }

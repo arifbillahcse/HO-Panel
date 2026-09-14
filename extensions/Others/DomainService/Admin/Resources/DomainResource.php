@@ -36,8 +36,8 @@ class DomainResource extends Resource
                     ->badge()
                     ->color(fn (string $state) => match ($state) {
                         Domain::STATUS_ACTIVE => 'success',
-                        Domain::STATUS_PENDING, Domain::STATUS_TRANSFER_PENDING => 'warning',
-                        Domain::STATUS_TRANSFER_FAILED, Domain::STATUS_EXPIRED => 'danger',
+                        Domain::STATUS_PENDING, Domain::STATUS_TRANSFER_PENDING, Domain::STATUS_GRACE => 'warning',
+                        Domain::STATUS_TRANSFER_FAILED, Domain::STATUS_EXPIRED, Domain::STATUS_REDEMPTION => 'danger',
                         default => 'gray',
                     })
                     ->sortable(),
@@ -47,9 +47,11 @@ class DomainResource extends Resource
                 SelectFilter::make('status')->options([
                     Domain::STATUS_ACTIVE => 'Active',
                     Domain::STATUS_PENDING => 'Pending',
+                    Domain::STATUS_GRACE => 'Grace period',
+                    Domain::STATUS_REDEMPTION => 'Redemption',
                     Domain::STATUS_TRANSFER_PENDING => 'Transfer pending',
                     Domain::STATUS_TRANSFER_FAILED => 'Transfer failed',
-                    Domain::STATUS_EXPIRED => 'Expired',
+                    Domain::STATUS_EXPIRED => 'Expired (lost)',
                     Domain::STATUS_CANCELLED => 'Cancelled',
                 ]),
                 SelectFilter::make('registrar')->relationship('registrar', 'name'),
