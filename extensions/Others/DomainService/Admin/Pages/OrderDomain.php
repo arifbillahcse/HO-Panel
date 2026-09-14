@@ -13,7 +13,6 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Notifications\Actions\Action as NotificationAction;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Actions;
@@ -140,7 +139,7 @@ class OrderDomain extends Page implements HasForms
                 ->title($data['mark_paid'] ? 'Order placed and marked paid — provisioning now.' : 'Order placed. Invoice sent to the customer to pay.')
                 ->success()
                 ->actions([
-                    NotificationAction::make('view')
+                    Action::make('view')
                         ->label('View invoice')
                         ->url(InvoiceResource::getUrl('edit', ['record' => $invoice]))
                         ->button(),
