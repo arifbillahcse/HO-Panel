@@ -100,13 +100,31 @@ class DomainSearch extends Component
                 continue;
             }
 
+            $checkout = route('products.checkout', [
+                'category' => $category->slug,
+                'product' => $product->slug,
+            ]);
+
             $option = $product->configOptions
                 ->firstWhere(fn ($o) => strtolower((string) $o->env_variable) === 'tld');
 
+            // One product per TLD: the product itself names the extension, and
+            // its plan price is the price. Nothing else to configure.
             if (!$option) {
+                $tld = $this->normaliseTld($product->name) ?? $this->normaliseTld($product->slug);
+
+                if ($tld && !$offers->contains(fn ($existing) => $existing['tld'] === $tld)) {
+                    $offers->push([
+                        'tld' => $tld,
+                        'price' => $this->price($plan),
+                        'url' => $checkout . '?' . http_build_query(['plan' => $plan->id]),
+                    ]);
+                }
+
                 continue;
             }
 
+            // One product covering many TLDs, priced per option value.
             foreach ($option->children as $value) {
                 $tld = $this->normaliseTld($value->name);
 
@@ -117,10 +135,7 @@ class DomainSearch extends Component
                 $offers->push([
                     'tld' => $tld,
                     'price' => $this->price($plan, $value),
-                    'url' => route('products.checkout', [
-                        'category' => $category->slug,
-                        'product' => $product->slug,
-                    ]) . '?' . http_build_query([
+                    'url' => $checkout . '?' . http_build_query([
                         'plan' => $plan->id,
                         'options' => [$option->id => $value->id],
                     ]),
@@ -128,19 +143,19 @@ class DomainSearch extends Component
             }
         }
 
-        return $offers->values();
+        return $offers->sortBy('tld')->values();
     }
 
     /**
      * Mirrors Checkout::updatePricing so the figure shown here is the figure
      * charged — plan price plus the extension's own price, taxed the same way.
      */
-    private function price($plan, $value): string
+    private function price($plan, $value = null): string
     {
         try {
             $base = $plan->price()->price;
 
-            $extra = $value->price(
+            $extra = $value?->price(
                 billing_period: $plan->billing_period,
                 billing_unit: $plan->billing_unit,
             )->price ?? 0;
