@@ -18,7 +18,7 @@ class CosmotownApi
 {
     private const LIVE_URL = 'https://cosmotown.com/v1/reseller/';
 
-    private const SANDBOX_URL = 'https://sandbox.cosmotown7.com/v1/reseller/';
+    private const SANDBOX_URL = 'https://sandbox.cosmotown.com/v1/reseller/';
 
     public function __construct(
         private string $apiKey,
