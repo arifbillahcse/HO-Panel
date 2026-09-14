@@ -1,0 +1,76 @@
+# Cosmotown for Paymenter
+
+Registers and renews domain names through the Cosmotown reseller API.
+
+## What works
+
+| | |
+|---|---|
+| Register on order | yes |
+| Renew on invoice payment | yes, automatic |
+| Nameservers at registration | yes |
+| Registrar lock | yes, customer-toggleable |
+| WHOIS privacy | yes, customer-toggleable |
+| Availability search | no — planned |
+| Transfers | no — planned |
+| EPP codes | no — endpoint unverified |
+| WHOIS contact edits | no — endpoint unverified |
+| Child nameservers | no — Cosmotown exposes no endpoint |
+
+## Setup
+
+**1. Add the server**
+
+Admin → Servers → Create, choose **Cosmotown**, then:
+
+- **Reseller API key** — Cosmotown → My Account → Reseller API. The key only, never your password.
+- **Sandbox mode** — tick this while testing. It sends everything to Cosmotown's sandbox, so no real domains are registered and nothing is billed. Use a sandbox API key when it's on.
+
+Press **Test Connection** before saving.
+
+**2. Create the product**
+
+Admin → Products → Create. Assign the Cosmotown server, then set:
+
+- **Registration period (years)** — usually 1. Renewals extend by the same amount.
+- **Default nameservers** — comma separated, e.g. `ns1.hostorio.com, ns2.hostorio.com`. Leave blank to keep Cosmotown's.
+
+Give it a **yearly recurring** plan so Paymenter raises renewal invoices on schedule.
+
+**3. Price your TLDs**
+
+Cosmotown's API publishes no wholesale price list, so retail prices are yours to set.
+
+Admin → Configurable Options → create a **Select** named `TLD`, one option per extension with its own price:
+
+```
+.com   1,400 BDT
+.net   1,600 BDT
+.org   1,500 BDT
+```
+
+Attach it to the product. Config option prices are included in renewal invoices as well as the first one, so a single product covers every TLD you sell.
+
+## How renewal works
+
+Paymenter raises a renewal invoice before expiry. When it is paid, `Invoice\Paid` fires and this extension calls `renewdomains`.
+
+Paymenter moves `expires_at` forward on payment **regardless of whether the registrar call succeeded**. So if Cosmotown rejects the renewal, the panel would show the domain as renewed while it quietly lapses months later. To make that impossible to miss, a failure sends an email to your system address and writes an error to the log. Watch for those.
+
+A repeated `Invoice\Paid` for the same invoice is ignored, so a redelivered event cannot buy a second year at your cost.
+
+## Suspension and termination
+
+**Suspend** sets the registrar lock. Domains have no real suspension; this at least prevents a transfer out while an invoice is unpaid.
+
+**Terminate** detaches the domain in Paymenter and does nothing at Cosmotown. There is no delete endpoint, and deleting a paid-up domain over an unpaid invoice would destroy something the customer owns. It lapses at its own expiry date instead.
+
+## Security note
+
+Paymenter logs every outbound HTTP call to **Admin → HTTP logs** when debug mode is on, and its redaction list covers only `authorization` and `password` headers. Cosmotown authenticates with `X-API-TOKEN`, which is **not** redacted — so your reseller API key will appear in those logs in plain text.
+
+Keep debug mode off in production, and rotate the key if you have had it on.
+
+## Rate limits
+
+`getActions()` reads live domain state for the service page, cached for five minutes so page refreshes don't spend API quota. The lock and privacy toggles clear that cache so changes appear immediately.
