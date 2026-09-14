@@ -47,18 +47,20 @@ return [
             'default' => 'Welcome to Hostorio!',
         ],
 
-        // Hostorio brand palette — navy #01257D anchor, orange #FF7800 accent.
+        // Hostorio brand palette. Paymenter drives every button from `primary`,
+        // and hostorio.com uses orange #FF7800 for actions with navy #01257D as
+        // chrome — so orange takes primary here and navy takes secondary.
         [
             'name' => 'primary',
             'label' => 'Primary - Brand Color (Light)',
             'type' => 'color',
-            'default' => 'hsl(223, 98%, 25%)',
+            'default' => 'hsl(28, 100%, 50%)',
         ],
         [
             'name' => 'secondary',
             'label' => 'Secondary - Brand Color (Light)',
             'type' => 'color',
-            'default' => 'hsl(28, 100%, 50%)',
+            'default' => 'hsl(223, 98%, 25%)',
         ],
         [
             'name' => 'neutral',
@@ -97,19 +99,19 @@ return [
             'default' => 'hsl(210, 17%, 98%)',
         ],
 
-        // Navy is too dark to carry the accent role on a dark ground, so the
-        // dark palette promotes the brand's bright blue #1368E7 instead.
+        // Orange holds up on a dark ground, so it stays primary. Navy does not,
+        // so secondary uses the palette's brighter blue #1368E7 in dark mode.
         [
             'name' => 'dark-primary',
             'label' => 'Primary - Brand Color (Dark)',
             'type' => 'color',
-            'default' => 'hsl(216, 85%, 58%)',
+            'default' => 'hsl(34, 100%, 50%)',
         ],
         [
             'name' => 'dark-secondary',
             'label' => 'Secondary - Brand Color (Dark)',
             'type' => 'color',
-            'default' => 'hsl(34, 100%, 50%)',
+            'default' => 'hsl(216, 85%, 58%)',
         ],
         [
             'name' => 'dark-neutral',
