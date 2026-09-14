@@ -120,16 +120,33 @@ class Show extends Component
             'Nameservers updated. Changes can take a few hours to spread across the internet.');
     }
 
+    /**
+     * Sets the new value locally rather than reloading from the registrar:
+     * Cosmotown (and registrars generally) can apply a lock/privacy change
+     * with a short propagation delay, so an immediate read-back after the
+     * write routinely still reports the old value and would make a
+     * successful toggle look like it silently failed.
+     */
     public function toggleLock(): void
     {
-        $this->run(fn () => $this->domain->driver()->setLock($this->domain, !$this->locked),
-            $this->locked ? 'Domain unlocked.' : 'Domain locked.');
+        $newValue = !$this->locked;
+
+        $this->run(function () use ($newValue) {
+            $this->domain->driver()->setLock($this->domain, $newValue);
+            $this->locked = $newValue;
+            $this->domain->update(['locked' => $newValue]);
+        }, $this->locked ? 'Domain unlocked.' : 'Domain locked.', reload: false);
     }
 
     public function togglePrivacy(): void
     {
-        $this->run(fn () => $this->domain->driver()->setPrivacy($this->domain, !$this->privacy),
-            $this->privacy ? 'WHOIS privacy disabled.' : 'WHOIS privacy enabled.');
+        $newValue = !$this->privacy;
+
+        $this->run(function () use ($newValue) {
+            $this->domain->driver()->setPrivacy($this->domain, $newValue);
+            $this->privacy = $newValue;
+            $this->domain->update(['privacy' => $newValue]);
+        }, $this->privacy ? 'WHOIS privacy disabled.' : 'WHOIS privacy enabled.', reload: false);
     }
 
     /**
