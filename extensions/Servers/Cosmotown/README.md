@@ -11,7 +11,7 @@ Registers and renews domain names through the Cosmotown reseller API.
 | Nameservers at registration | yes |
 | Registrar lock | yes, customer-toggleable |
 | WHOIS privacy | yes, customer-toggleable |
-| Availability search | no — planned |
+| Availability search | yes, at `/domains` |
 | Transfers | no — planned |
 | EPP codes | no — endpoint unverified |
 | WHOIS contact edits | no — endpoint unverified |
@@ -50,6 +50,27 @@ Admin → Configurable Options → create a **Select** named `TLD`, one option p
 ```
 
 Attach it to the product. Config option prices are included in renewal invoices as well as the first one, so a single product covers every TLD you sell.
+
+## Domain search
+
+A public search page is added at **`/domains`**, linked from the storefront
+navigation. Customers type a name, see every TLD you sell with its price, and
+click through to a checkout with the domain already filled in.
+
+The TLD list and prices come from the `TLD` configurable option above — there
+is no separate list inside the extension to keep in sync. Add a TLD there and
+it appears in search immediately.
+
+**Availability is resolved over RDAP**, the registry protocol, not the
+Cosmotown API. Cosmotown's own client does the same. That means searches spend
+no API quota and cannot trip your reseller rate limit, and search keeps working
+regardless of what Cosmotown does to its endpoints. Answers are cached for ten
+minutes; failures are never cached and show as "couldn't check" rather than
+claiming a taken domain is free.
+
+If search shows *"No domain extensions are configured for sale yet"*, the
+product either has no `TLD` option attached or its `env_variable` is not
+exactly `tld`.
 
 ## How renewal works
 
