@@ -10,6 +10,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Paymenter\Extensions\Others\DomainService\Admin\Resources\DomainResource\Pages\ListDomains;
 use Paymenter\Extensions\Others\DomainService\Models\Domain;
+use Paymenter\Extensions\Others\DomainService\Services\TransferPollService;
 use Throwable;
 
 /**
@@ -68,6 +69,45 @@ class DomainResource extends Resource
                         } catch (Throwable $e) {
                             Notification::make()->title('Sync failed')->body($e->getMessage())->danger()->send();
                         }
+                    }),
+                Action::make('checkTransfer')
+                    ->label('Check Transfer')
+                    ->icon('ri-time-line')
+                    ->visible(fn (Domain $record) => $record->status === Domain::STATUS_TRANSFER_PENDING)
+                    ->action(function (Domain $record) {
+                        try {
+                            app(TransferPollService::class)->poll($record);
+                            $record->refresh();
+
+                            match ($record->status) {
+                                Domain::STATUS_ACTIVE => Notification::make()->title('Transfer completed — domain is now active')->success()->send(),
+                                Domain::STATUS_TRANSFER_FAILED => Notification::make()->title('Registrar reports the transfer failed')->danger()->send(),
+                                default => Notification::make()->title('Still pending at the registrar')->body('No change yet — try again later.')->warning()->send(),
+                            };
+                        } catch (Throwable $e) {
+                            Notification::make()->title('Could not check transfer status')->body($e->getMessage())->danger()->send();
+                        }
+                    }),
+                Action::make('forceActive')
+                    ->label('Force Active')
+                    ->icon('ri-shield-check-line')
+                    ->color('warning')
+                    ->visible(fn (Domain $record) => in_array($record->status, [Domain::STATUS_PENDING, Domain::STATUS_TRANSFER_PENDING], true))
+                    ->requiresConfirmation()
+                    ->modalDescription('Marks this domain active without waiting for registrar confirmation. Only use this once you have verified at the registrar that the domain is really live under your account — this does not register or transfer anything itself.')
+                    ->action(function (Domain $record) {
+                        $record->update([
+                            'status' => Domain::STATUS_ACTIVE,
+                            'registered_at' => $record->registered_at ?? now(),
+                        ]);
+
+                        try {
+                            $record->driver()->sync($record);
+                        } catch (Throwable $e) {
+                            // Status is set either way; a sync failure just means expiry/nameservers stay unrefreshed for now.
+                        }
+
+                        Notification::make()->title('Domain marked active')->success()->send();
                     }),
             ])
             ->defaultSort('created_at', 'desc');
