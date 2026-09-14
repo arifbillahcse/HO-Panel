@@ -4,8 +4,13 @@ namespace Paymenter\Extensions\Others\DomainService;
 
 use App\Attributes\ExtensionMeta;
 use App\Classes\Extension\Extension;
+use App\Events\Invoice\Paid;
 use App\Helpers\ExtensionHelper;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Schedule;
+use Paymenter\Extensions\Others\DomainService\Jobs\ProvisionDomainJob;
+use Paymenter\Extensions\Others\DomainService\Models\DomainInvoice;
+use Paymenter\Extensions\Others\DomainService\Services\DomainRenewalService;
 use Illuminate\Support\Facades\Gate;
 use Paymenter\Extensions\Others\DomainService\Models\Domain;
 use Paymenter\Extensions\Others\DomainService\Models\DomainRegistrar;
@@ -47,7 +52,25 @@ class DomainService extends Extension
             'admin.domains.manage' => 'Manage domains, registrars and pricing',
         ]);
 
-        // The customer routes/nav, the renewal schedule and the Invoice\Paid
-        // listener arrive in the next Phase 1 steps.
+        // When a domain invoice is paid, hand the registrar work to a queued
+        // job. Paymenter's existing payment flow (EPS included) fires this;
+        // there is nothing extra to wire on the payment side.
+        Event::listen(Paid::class, function (Paid $event) {
+            DomainInvoice::where('invoice_id', $event->invoice->id)
+                ->where('processed', false)
+                ->get()
+                ->each(fn (DomainInvoice $link) => ProvisionDomainJob::dispatch($link->id));
+        });
+
+        // Raise renewal invoices ahead of expiry. Console-only: boot() also
+        // runs on web requests, where scheduling is pure overhead.
+        if (app()->runningInConsole()) {
+            Schedule::call(fn () => (new DomainRenewalService)->sweep())
+                ->name('domainservice-renewals')
+                ->daily()
+                ->withoutOverlapping();
+        }
+
+        // The customer routes, nav and pages arrive in step 6.
     }
 }
