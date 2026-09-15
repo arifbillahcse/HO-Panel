@@ -18,7 +18,14 @@ class ImpersonateMiddleware
     public function handle(Request $request, Closure $next): Response
     {
         if (session()->has('impersonating')) {
-            if ($request->is('admin/*')) {
+            // "admin/*" alone does not match the bare "/admin" path (the
+            // dashboard itself has nothing after the slash) — same gap as
+            // BasePolicy::adminPermission() had, and with the same effect
+            // here: landing on the dashboard exactly would skip clearing
+            // impersonation and instead re-apply it, silently switching the
+            // request to the impersonated customer, who then gets a 403
+            // from the panel's own access check.
+            if ($request->is('admin') || $request->is('admin/*')) {
                 // Unset session
                 session()->forget('impersonating');
             } else {

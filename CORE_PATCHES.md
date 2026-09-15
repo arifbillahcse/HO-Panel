@@ -42,7 +42,25 @@ return (request()->is('admin') || request()->is('admin/*') || request()->routeIs
 re-add the `request()->is('admin')` alternative to the `adminPermission()`
 condition.
 
-### 2. `app/Classes/Cart.php` — caching bug
+### 2. `app/Http/Middleware/ImpersonateMiddleware.php`
+
+**Bug:** same root cause as #1, different file. It clears the
+`impersonating` session flag on `$request->is('admin/*')` — again never
+matching the bare `/admin` dashboard path. Landing on the dashboard exactly
+while an impersonation was active skipped the clear and instead re-applied
+it, silently swapping the request to the impersonated (non-admin) user, who
+then correctly gets a 403 from the panel's own access check. Reads as "the
+whole admin panel is broken" when it's really just a stuck impersonation
+session.
+
+**Fix:** same shape as #1 — also accept the bare `admin` path in the
+condition that clears `impersonating`.
+
+**On a merge conflict here:** take upstream's version, then re-add
+`$request->is('admin')` alongside `$request->is('admin/*')` in the
+`if` that clears the `impersonating` session key.
+
+### 3. `app/Classes/Cart.php` — caching bug
 
 **Bug:** `Cart::get()` memoized the current cart with PHP's `once()` helper,
 which caches by call site for the entire request. `validateCoupon()` reads
