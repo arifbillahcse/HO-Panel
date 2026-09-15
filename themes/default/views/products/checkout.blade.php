@@ -80,37 +80,51 @@
         @endforeach
 
         @if ($productNeedsDomain)
-        <div class="flex flex-col gap-3 border border-neutral rounded-md p-4">
-            <h2 class="text-xl font-semibold">Domain</h2>
-            <p class="text-sm text-base/60">This hosting plan needs a domain to be set up under.</p>
+        <div class="flex flex-col gap-4 bg-background-secondary border border-neutral rounded-lg p-5">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <h2 class="text-xl font-semibold">Choose Domain</h2>
+                    <p class="text-sm text-base/60 mt-1">This hosting plan needs a domain to be set up under.</p>
+                </div>
+                @if ($domainChoice === 'register' && $this->selectedDomainPrice())
+                <div class="shrink-0 bg-background border border-neutral rounded-full px-4 py-1.5 text-sm font-semibold whitespace-nowrap">
+                    {{ $this->selectedDomainPrice() }} <span class="font-normal text-base/60">/1st year</span>
+                </div>
+                @endif
+            </div>
 
-            <div class="flex flex-col gap-2">
-                <label class="flex items-center gap-2">
+            <div class="flex flex-wrap gap-x-6 gap-y-2 border-b border-neutral pb-4">
+                <label class="flex items-center gap-2 cursor-pointer">
                     <input type="radio" wire:model.live="domainChoice" value="register">
-                    Register a new domain
+                    Register a Domain
                 </label>
-                <label class="flex items-center gap-2">
+                <label class="flex items-center gap-2 cursor-pointer">
                     <input type="radio" wire:model.live="domainChoice" value="transfer">
-                    Transfer a domain in
+                    Transfer Domain
                 </label>
-                <label class="flex items-center gap-2">
+                <label class="flex items-center gap-2 cursor-pointer">
                     <input type="radio" wire:model.live="domainChoice" value="existing">
-                    Use a domain I already have
+                    Use Existing Domain
                 </label>
             </div>
 
             @if ($domainChoice === 'register')
-            <div class="flex flex-col sm:flex-row gap-2">
-                <x-form.input wire:model="domainLabel" name="domainLabel" placeholder="yourdomain" divClass="!mt-0 flex-1" />
-                <x-form.select wire:model="domainTld" name="domainTld" divClass="!mt-0 sm:w-64">
-                    @foreach ($domainTldOptions as $option)
-                        <option value="{{ $option['tld'] }}">{{ $option['label'] }}</option>
-                    @endforeach
-                </x-form.select>
+            <div>
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <x-form.input wire:model="domainLabel" name="domainLabel" label="Enter your domain" placeholder="yourdomain" divClass="!mt-0 flex-1" />
+                    <x-form.select wire:model.live="domainTld" name="domainTld" label="TLD" divClass="!mt-0 sm:w-48">
+                        @foreach ($domainTldOptions as $option)
+                            <option value="{{ $option['tld'] }}">.{{ $option['tld'] }}</option>
+                        @endforeach
+                    </x-form.select>
+                </div>
+                <p class="text-xs text-base/60 mt-1.5">We'll check availability on Continue.</p>
             </div>
             @elseif ($domainChoice === 'transfer')
-            <x-form.input wire:model="domainFull" name="domainFull" label="Domain name" placeholder="yourdomain.com" />
-            <x-form.input wire:model="domainAuthCode" name="domainAuthCode" label="Authorisation (EPP) code" />
+            <div class="flex flex-col sm:flex-row gap-2">
+                <x-form.input wire:model="domainFull" name="domainFull" label="Domain name" placeholder="yourdomain.com" divClass="!mt-0 flex-1" />
+                <x-form.input wire:model="domainAuthCode" name="domainAuthCode" label="Authorisation (EPP) code" divClass="!mt-0 flex-1" />
+            </div>
             @else
             <x-form.input wire:model="domainFull" name="domainFull" label="Domain name" placeholder="yourdomain.com" />
             @endif

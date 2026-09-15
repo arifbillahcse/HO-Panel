@@ -155,9 +155,12 @@ class Checkout extends Component
                     return null;
                 }
 
+                $formattedPrice = ($currency->prefix ?? '') . number_format((float) $price->register_price, 2) . ($currency->suffix ?? '');
+
                 return [
                     'tld' => $tld->tld,
-                    'label' => '.' . $tld->tld . ' - ' . ($currency->prefix ?? '') . number_format((float) $price->register_price, 2) . ($currency->suffix ?? ''),
+                    'label' => '.' . $tld->tld . ' - ' . $formattedPrice,
+                    'price' => $formattedPrice,
                 ];
             })
             ->filter()
@@ -167,6 +170,17 @@ class Checkout extends Component
         if ($this->domainTld === '' && !empty($this->domainTldOptions)) {
             $this->domainTld = $this->domainTldOptions[0]['tld'];
         }
+    }
+
+    public function selectedDomainPrice(): ?string
+    {
+        foreach ($this->domainTldOptions as $option) {
+            if ($option['tld'] === $this->domainTld) {
+                return $option['price'];
+            }
+        }
+
+        return null;
     }
 
     private function domainCurrency(): Currency
