@@ -2,14 +2,12 @@
 
 namespace Paymenter\Extensions\Others\DomainService\Livewire;
 
+use App\Classes\Cart;
 use App\Exceptions\DisplayException;
 use App\Livewire\Component;
-use App\Models\Currency;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
-use Paymenter\Extensions\Others\DomainService\Services\DomainOrderService;
 use Paymenter\Extensions\Others\DomainService\Support\DomainAvailability;
-use Throwable;
 
 class Transfer extends Component
 {
@@ -52,32 +50,23 @@ class Transfer extends Component
             return null;
         }
 
-        try {
-            $invoice = app(DomainOrderService::class)->transfer(
-                Auth::user(),
-                $name,
-                $this->currencyCode(),
-                $this->authCode,
-            );
-        } catch (DisplayException $e) {
-            $this->notify($e->getMessage(), 'error');
+        $dot = strpos($name, '.');
 
-            return null;
-        } catch (Throwable $e) {
-            report($e);
-            $this->notify('We could not start that transfer. Please try again.', 'error');
+        if ($dot === false) {
+            $this->addError('domain', 'Enter a full domain name, for example example.com.');
 
             return null;
         }
 
-        return $this->redirect(route('invoices.show', $invoice) . '?pay=true', true);
-    }
+        try {
+            Cart::addDomain($name, substr($name, $dot + 1), 'transfer', 1, $this->authCode);
+        } catch (DisplayException $e) {
+            $this->notify($e->getMessage(), 'error');
 
-    private function currencyCode(): string
-    {
-        $code = session('currency', config('settings.default_currency'));
+            return null;
+        }
 
-        return (Currency::find($code) ?? Currency::query()->first())?->code ?? 'USD';
+        return $this->redirect(route('cart'), true);
     }
 
     public function render()

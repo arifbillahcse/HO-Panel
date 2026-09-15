@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Session;
+use Paymenter\Extensions\Others\DomainService\Models\DomainCartItem;
 
 class Cart
 {
@@ -129,6 +130,48 @@ class Cart
         if (!$existingItem && $cart->items()->count() >= self::DEFAULT_MAX_ITEMS) {
             throw new DisplayException('Your cart cannot contain more than ' . self::DEFAULT_MAX_ITEMS . ' items.');
         }
+    }
+
+    /**
+     * Domain lines live in their own table (domain_cart_items) rather than
+     * cart_items, since a domain has no product/plan behind it — priced
+     * straight from Domain Service's own TLD pricing table instead. They
+     * still belong to the same Cart row, so they check out in the same
+     * transaction and invoice as everything else in items().
+     */
+    public static function addDomain(string $name, string $tld, string $action, int $years, ?string $authCode = null): int
+    {
+        self::checkRateLimit();
+
+        $cart = self::createCart();
+
+        if (DomainCartItem::where('cart_id', $cart->id)->count() >= self::DEFAULT_MAX_ITEMS) {
+            throw new DisplayException('Your cart cannot contain more than ' . self::DEFAULT_MAX_ITEMS . ' items.');
+        }
+
+        $item = DomainCartItem::create([
+            'cart_id' => $cart->id,
+            'name' => $name,
+            'tld' => $tld,
+            'action' => $action,
+            'years' => $years,
+            'auth_code' => $authCode,
+        ]);
+
+        self::forgetCache();
+
+        return $item->id;
+    }
+
+    public static function removeDomain($index): void
+    {
+        DomainCartItem::where('cart_id', self::get()->id)->where('id', $index)->delete();
+        self::forgetCache();
+    }
+
+    public static function domainItems()
+    {
+        return DomainCartItem::where('cart_id', self::get()->id)->get();
     }
 
     protected static function checkRateLimit()

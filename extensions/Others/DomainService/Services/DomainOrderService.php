@@ -149,6 +149,82 @@ class DomainOrderService
         });
     }
 
+    /**
+     * Resolves a cart line's name to its TLD and pricing without creating
+     * anything — used both to price a domain line live on the cart page
+     * (CartItem does the same for products) and to re-validate it for real
+     * at checkout, since a cart is never trusted for pricing.
+     *
+     * @return array{sld: string, tldName: string, tld: DomainTld, pricing: mixed}
+     */
+    public function resolveForCart(string $name, string $currency): array
+    {
+        $name = strtolower(trim($name));
+        $currency = strtoupper($currency);
+
+        [$sld, $tldName] = $this->split($name);
+        $tld = $this->tld($tldName);
+        $pricing = $this->pricing($tld, $currency);
+
+        return compact('sld', 'tldName', 'tld', 'pricing');
+    }
+
+    /**
+     * The cart-checkout counterpart to register()/transfer(): those two
+     * create their own invoice because they're reached directly (search,
+     * transfer form, admin "Order for customer"), but a cart checkout
+     * already has one shared invoice for every line in the cart, hosting
+     * included. This just creates the domain and its invoice link against
+     * that existing invoice instead of a new one.
+     */
+    public function createForCheckout(
+        User $user,
+        string $name,
+        DomainTld $tld,
+        string $action,
+        int $years,
+        ?string $authCode,
+        string $currency,
+        Invoice $invoice,
+        ?int $orderId = null,
+    ): Domain {
+        [$sld, $tldName] = $this->split($name);
+        $isTransfer = $action === 'transfer';
+        $years = $isTransfer ? max(1, $years) : max($tld->min_years, min($tld->max_years, $years));
+
+        if (Domain::where('name', $name)->where('status', '!=', Domain::STATUS_CANCELLED)->exists()) {
+            throw new DisplayException("The domain {$name} is already registered with us.");
+        }
+
+        if ($isTransfer && !$authCode) {
+            throw new DisplayException("An authorisation (EPP) code is required to transfer {$name}.");
+        }
+
+        return DB::transaction(function () use ($user, $name, $sld, $tldName, $tld, $isTransfer, $years, $authCode, $currency, $invoice, $orderId) {
+            $domain = Domain::create([
+                'user_id' => $user->id,
+                'order_id' => $orderId,
+                'registrar_id' => $tld->registrar_id,
+                'name' => $name,
+                'sld' => $sld,
+                'tld' => $tldName,
+                'currency' => $currency,
+                'auth_code' => $isTransfer ? $authCode : null,
+                'status' => $isTransfer ? Domain::STATUS_TRANSFER_PENDING : Domain::STATUS_PENDING,
+                'autorenew' => true,
+            ]);
+
+            DomainInvoice::create([
+                'invoice_id' => $invoice->id,
+                'domain_id' => $domain->id,
+                'action' => $isTransfer ? DomainInvoice::ACTION_TRANSFER : DomainInvoice::ACTION_REGISTER,
+                'years' => $years,
+            ]);
+
+            return $domain;
+        });
+    }
+
     /** @return array{0: string, 1: string}  [sld, tld] */
     private function split(string $name): array
     {

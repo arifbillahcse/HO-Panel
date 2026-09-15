@@ -16,6 +16,8 @@ use Exception;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Locked;
+use Paymenter\Extensions\Others\DomainService\Services\DomainOrderService;
+use Paymenter\Extensions\Others\DomainService\Support\DomainAvailability;
 
 class Cart extends Component
 {
@@ -40,12 +42,20 @@ class Cart extends Component
 
     private function updateTotal()
     {
-        if (ClassesCart::items()->count() == 0) {
+        $domainItems = ClassesCart::domainItems();
+
+        if (ClassesCart::items()->count() == 0 && $domainItems->isEmpty()) {
             $this->total = null;
 
             return;
         }
-        $this->total = new Price(['price' => ClassesCart::items()->sum(fn ($item) => $item->price->total * $item->quantity), 'currency' => ClassesCart::get()->currency]);
+        $productTotal = ClassesCart::items()->sum(fn ($item) => $item->price->total * $item->quantity);
+        // Domain lines have no quantity of their own — years are already
+        // folded into price() (unlike a product, a 2-year domain is one
+        // line at one price, not a line at unit price times 2).
+        $domainTotal = $domainItems->sum(fn ($item) => $item->price->total);
+
+        $this->total = new Price(['price' => $productTotal + $domainTotal, 'currency' => ClassesCart::get()->currency]);
         $this->gateways = ExtensionHelper::getCheckoutGateways($this->total->total, $this->total->currency->code, 'cart', ClassesCart::items());
         if (count($this->gateways) > 0 && !array_search($this->gateway, array_column($this->gateways, 'id')) !== false) {
             $this->gateway = $this->gateways[0]->id;
@@ -88,6 +98,12 @@ class Cart extends Component
         $this->updateTotal();
     }
 
+    public function removeDomain($index)
+    {
+        ClassesCart::removeDomain($index);
+        $this->updateTotal();
+    }
+
     public function updateQuantity($index, $quantity)
     {
         ClassesCart::updateQuantity($index, $quantity);
@@ -97,7 +113,9 @@ class Cart extends Component
     // Checkout
     public function checkout()
     {
-        if (ClassesCart::items()->count() === 0) {
+        $domainItems = ClassesCart::domainItems();
+
+        if (ClassesCart::items()->count() === 0 && $domainItems->isEmpty()) {
             return $this->notify('Your cart is empty', 'error');
         }
         if (!Auth::check()) {
@@ -151,6 +169,27 @@ class Cart extends Component
                     $product->save();
                 }
             }
+
+            // Re-validate every domain line: a cart is never trusted for
+            // pricing or availability, since either can change while it
+            // sits there. Resolves pricing fresh and, for a new
+            // registration, confirms it has not just been taken.
+            $resolvedDomains = [];
+            foreach ($domainItems as $domainItem) {
+                $resolved = app(DomainOrderService::class)->resolveForCart($domainItem->name, $cart->currency_code);
+
+                if ($domainItem->action === 'register') {
+                    $availability = (new DomainAvailability)->check([$domainItem->name]);
+                    if (($availability[$domainItem->name] ?? null) === DomainAvailability::TAKEN) {
+                        throw new DisplayException("{$domainItem->name} was just registered by someone else — please remove it from your cart.");
+                    }
+                } elseif (empty($domainItem->auth_code)) {
+                    throw new DisplayException("Missing authorisation code for {$domainItem->name}.");
+                }
+
+                $resolvedDomains[] = [$domainItem, $resolved['tld']];
+            }
+
             // Create the order
             $order = new Order([
                 'user_id' => $user->id,
@@ -240,6 +279,21 @@ class Cart extends Component
                     $service->expires_at = $service->calculateNextDueDate();
                     $service->save();
                 }
+            }
+
+            // Create the domains, against the same invoice as the hosting above.
+            foreach ($resolvedDomains as [$domainItem, $tld]) {
+                app(DomainOrderService::class)->createForCheckout(
+                    $user,
+                    $domainItem->name,
+                    $tld,
+                    $domainItem->action,
+                    $domainItem->years,
+                    $domainItem->auth_code,
+                    $cart->currency_code,
+                    $invoice,
+                    $order->id,
+                );
             }
 
             // Commit the transaction

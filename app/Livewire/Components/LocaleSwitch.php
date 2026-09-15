@@ -23,7 +23,7 @@ class LocaleSwitch extends Component
             'label' => $currency->name,
         ])->values()->toArray();
 
-        if ((count($this->currencies) <= 1 || Cart::items()->count() > 0) && count(config('settings.allowed_languages', [])) <= 1) {
+        if ((count($this->currencies) <= 1 || Cart::items()->count() > 0 || Cart::domainItems()->count() > 0) && count(config('settings.allowed_languages', [])) <= 1) {
             $this->skipRender();
         }
     }
@@ -33,7 +33,7 @@ class LocaleSwitch extends Component
         $this->validate([
             'currentCurrency' => 'required|exists:currencies,code',
         ]);
-        if (Cart::items()->count() > 0) {
+        if (Cart::items()->count() > 0 || Cart::domainItems()->count() > 0) {
             $this->notify('You cannot change the currency while there are items in the cart.', 'error');
             $this->currentCurrency = session('currency', config('settings.default_currency'));
 

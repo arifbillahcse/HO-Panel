@@ -12,7 +12,7 @@ class Cart extends Component
 
     public function mount()
     {
-        $this->cartCount = ClassesCart::items()->count();
+        $this->cartCount = ClassesCart::items()->count() + ClassesCart::domainItems()->count();
         if ($this->cartCount === 0) {
             $this->skipRender();
         }
@@ -21,7 +21,7 @@ class Cart extends Component
     #[On('cartUpdated')]
     public function onCartUpdated()
     {
-        $this->cartCount = ClassesCart::items()->count();
+        $this->cartCount = ClassesCart::items()->count() + ClassesCart::domainItems()->count();
     }
 
     public function render()

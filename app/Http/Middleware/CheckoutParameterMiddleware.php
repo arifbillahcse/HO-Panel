@@ -65,6 +65,7 @@ class CheckoutParameterMiddleware
     private function shouldBlockCurrencyChange(string $currencyCode): bool
     {
         return Cart::items()->count() > 0 ||
+            Cart::domainItems()->count() > 0 ||
             Currency::where('code', $currencyCode)->doesntExist();
     }
 }

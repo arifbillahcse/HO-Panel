@@ -29,6 +29,17 @@ class Order extends Model implements Auditable
     }
 
     /**
+     * Domains bought through the cart alongside hosting. Belongs to the
+     * Domain Service extension (extensions/Others/DomainService) — this
+     * relation assumes it is installed, same as the invoices() attribute
+     * below.
+     */
+    public function domains()
+    {
+        return $this->hasMany(\Paymenter\Extensions\Others\DomainService\Models\Domain::class);
+    }
+
+    /**
      * Get the currency corresponding to the service.
      */
     public function currency()
@@ -66,7 +77,9 @@ class Order extends Model implements Auditable
     public function invoices(): Attribute
     {
         // Each service has invoices (it is a hasManyThrough relationship order -> service -> invoiceItem -> invoice)
-        $invoicesId = $this->services->map(fn ($service) => $service->invoiceItems->map(fn ($invoiceItem) => $invoiceItem->invoice_id))->flatten();
+        $invoicesId = $this->services->map(fn ($service) => $service->invoiceItems->map(fn ($invoiceItem) => $invoiceItem->invoice_id))->flatten()
+            // A domain bought alongside hosting shares that same invoice via its own DomainInvoice link.
+            ->merge($this->domains->map(fn ($domain) => $domain->invoices->pluck('invoice_id'))->flatten());
 
         return new Attribute(
             get: fn () => Invoice::whereIn('id', $invoicesId)

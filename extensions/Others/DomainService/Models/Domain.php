@@ -27,7 +27,7 @@ class Domain extends Model
     public const LAPSED_STATUSES = [self::STATUS_GRACE, self::STATUS_REDEMPTION];
 
     protected $fillable = [
-        'user_id', 'registrar_id', 'name', 'sld', 'tld', 'registrar_ref', 'currency', 'auth_code', 'status',
+        'user_id', 'order_id', 'registrar_id', 'name', 'sld', 'tld', 'registrar_ref', 'currency', 'auth_code', 'status',
         'registered_at', 'expires_at', 'nameservers', 'locked', 'privacy', 'autorenew',
     ];
 
@@ -44,6 +44,12 @@ class Domain extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    /** Null for domains created outside the cart — admin "Order for Customer" and "Import Domain". */
+    public function order()
+    {
+        return $this->belongsTo(\App\Models\Order::class);
     }
 
     public function registrar()

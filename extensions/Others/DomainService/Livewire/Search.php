@@ -2,6 +2,7 @@
 
 namespace Paymenter\Extensions\Others\DomainService\Livewire;
 
+use App\Classes\Cart;
 use App\Exceptions\DisplayException;
 use App\Livewire\Component;
 use App\Models\Currency;
@@ -9,9 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Url;
 use Paymenter\Extensions\Others\DomainService\Models\DomainTld;
-use Paymenter\Extensions\Others\DomainService\Services\DomainOrderService;
 use Paymenter\Extensions\Others\DomainService\Support\DomainAvailability;
-use Throwable;
 
 class Search extends Component
 {
@@ -105,7 +104,8 @@ class Search extends Component
 
         // Do not take money for a domain that is already registered elsewhere.
         // Only a definite "taken" blocks — an RDAP hiccup (unknown) must not
-        // stop a legitimate order.
+        // stop a legitimate order. Checked again for real at checkout, since
+        // availability can change while it sits in the cart.
         if ((new DomainAvailability)->check([$name])[$name] === DomainAvailability::TAKEN) {
             $this->notify('That domain was just taken. Please choose another.', 'error');
 
@@ -113,23 +113,14 @@ class Search extends Component
         }
 
         try {
-            $invoice = app(DomainOrderService::class)->register(
-                Auth::user(),
-                $name,
-                $this->currency(),
-            );
+            Cart::addDomain($name, $tld, 'register', 1);
         } catch (DisplayException $e) {
             $this->notify($e->getMessage(), 'error');
 
             return null;
-        } catch (Throwable $e) {
-            report($e);
-            $this->notify('We could not start that order. Please try again.', 'error');
-
-            return null;
         }
 
-        return $this->redirect(route('invoices.show', $invoice) . '?pay=true', true);
+        return $this->redirect(route('cart'), true);
     }
 
     /** Offered TLDs priced in the visitor's currency. */

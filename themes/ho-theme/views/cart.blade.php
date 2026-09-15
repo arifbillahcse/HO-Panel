@@ -1,11 +1,37 @@
 <div class="container mt-14">
     <div class="flex flex-col md:grid md:grid-cols-4 gap-8">
         <div class="flex flex-col col-span-3 gap-4">
-            @if (Cart::items()->count() === 0)
+            @if (Cart::items()->count() === 0 && Cart::domainItems()->count() === 0)
             <h1 class="text-2xl font-semibold">
                 {{ __('product.empty_cart') }}
             </h1>
             @endif
+            @foreach (Cart::domainItems() as $domainItem)
+            <div class="flex flex-row justify-between w-full bg-background-secondary p-3 rounded-md border border-neutral">
+                <div class="flex flex-col gap-1">
+                    <h2 class="text-2xl font-semibold">
+                        {{ $domainItem->name }}
+                    </h2>
+                    <p class="text-sm">
+                        {{ $domainItem->action === 'transfer' ? 'Domain transfer' : 'Domain registration' }}
+                        @if ($domainItem->action === 'register')
+                        &middot; {{ $domainItem->years }} {{ \Illuminate\Support\Str::plural('year', $domainItem->years) }}
+                        @endif
+                    </p>
+                </div>
+                <div class="flex flex-col justify-between items-end gap-4">
+                    <h3 class="text-xl font-semibold p-1">
+                        {{ $domainItem->price }}
+                    </h3>
+                    <x-button.danger wire:click="removeDomain({{ $domainItem->id }})" class="h-fit !w-fit">
+                        <x-loading target="removeDomain({{ $domainItem->id }})" />
+                        <div wire:loading.remove wire:target="removeDomain({{ $domainItem->id }})">
+                            {{ __('product.remove') }}
+                        </div>
+                    </x-button.danger>
+                </div>
+            </div>
+            @endforeach
             @foreach (Cart::items() as $item)
             <div class="flex flex-row justify-between w-full bg-background-secondary p-3 rounded-md border border-neutral">
                 <div class="flex flex-col gap-1">
@@ -67,7 +93,7 @@
             @endforeach
         </div>
         <div class="flex flex-col gap-4">
-            @if (Cart::items()->count() > 0)
+            @if (Cart::items()->count() > 0 || Cart::domainItems()->count() > 0)
             <div class="flex flex-col gap-2 w-full col-span-1 bg-background-secondary p-3 rounded-md border border-neutral">
                 <h2 class="text-2xl font-semibold mb-3">
                     {{ __('product.order_summary') }}
