@@ -1,0 +1,47 @@
+name: Build theme assets
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build and commit compiled theme assets
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Code checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 22
+
+      - uses: shivammathur/setup-php@15c43e89cdef867065b0213be354c2841860869e
+        with:
+          php-version: '8.3'
+
+      - name: Install dependencies
+        run: |
+          composer install -q --no-dev --optimize-autoloader --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
+          npm ci
+
+      - name: Build default theme
+        run: npm run build
+
+      - name: Build ho-theme
+        run: npm run build -- ho-theme
+
+      - name: Commit compiled assets
+        run: |
+          git config --local user.email "ci@hostorio.com"
+          git config --local user.name "Hostorio CI"
+          git add -f public/build
+          if git diff --cached --quiet; then
+            echo "No changes to compiled assets."
+          else
+            git commit -m "chore(build): rebuild compiled theme assets [skip ci]"
+            git push
+          fi
