@@ -148,3 +148,46 @@ its own:
 ```bash
 php artisan migrate --path=extensions/Others/DomainService/database/migrations
 ```
+
+## C. Mandatory domain step on hosting checkout
+
+Business rule: hosting cannot be bought without a domain attached — register
+one, transfer one in, or point it at one the customer already has. Builds on
+section B: this adds a required domain step to the product's own checkout
+page, which then feeds the same `Cart::addDomain()` path.
+
+**Scoping, without a new per-product setting:** a hosting server module
+(cPanel, DirectAdmin, ...) already declares a checkout-config field named
+`domain` — that's how it knows what to provision. This step is shown only
+when that field is present on the product, so an SSL/email addon with no
+such field is entirely unaffected.
+
+### `app/Livewire/Products/Checkout.php`
+- Detects `$productNeedsDomain` from the product's checkout-config schema
+  (see above).
+- Adds `domainChoice` (register/transfer/existing) plus the fields each
+  choice needs, and `domainRules()` for their validation — merged into
+  `rules()` only when `$productNeedsDomain` is true.
+- The generic checkout-config loops (in `rules()`, `attributes()`, and
+  `checkout()`) now skip the `domain` field by name when
+  `$productNeedsDomain` — it's driven by the dedicated fields above instead
+  of a plain bound input.
+- `checkout()`: always writes a real domain name into
+  `checkoutConfig['domain']` (every choice needs this — it's what the
+  server module reads), and additionally calls `Cart::addDomain()` for
+  register/transfer only. "Existing" only sets the config value.
+- The `mount()` auto-checkout shortcut (skip the form entirely for a
+  single-plan, no-config product) is now also gated on
+  `!$productNeedsDomain`, since the domain step is never optional.
+- Editing an in-cart item whose product needs a domain always reopens on
+  "existing" with the stored name — the original register/transfer choice
+  isn't reconstructed, since a paired `DomainCartItem` isn't looked back up.
+  Switching back to register/transfer while editing adds a fresh domain
+  line rather than reconciling one that might already be in the cart. A
+  known limitation, not a bug: acceptable for now, revisit if it causes
+  real confusion.
+
+### `themes/default/views/products/checkout.blade.php`
+Renders the domain step (not core — themes are never touched by
+Paymenter's updater, so this file carries no merge risk). `ho-theme` has no
+override for this view, so it inherits from `default`.

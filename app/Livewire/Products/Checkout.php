@@ -4,14 +4,18 @@ namespace App\Livewire\Products;
 
 use App\Classes\Cart;
 use App\Classes\Price;
+use App\Exceptions\DisplayException;
 use App\Helpers\ExtensionHelper;
 use App\Livewire\Component;
 use App\Models\Category;
+use App\Models\Currency;
 use App\Models\Plan;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
+use Paymenter\Extensions\Others\DomainService\Models\DomainTld;
+use Paymenter\Extensions\Others\DomainService\Support\DomainAvailability;
 
 class Checkout extends Component
 {
@@ -39,6 +43,35 @@ class Checkout extends Component
     #[Url(as: 'edit'), Locked]
     public $cartProductKey = null;
 
+    /**
+     * A product whose server module asks for a "domain" checkout-config
+     * field cannot be hosted without one — that field is how the server
+     * module (cPanel, DirectAdmin, ...) knows what to provision. Detecting
+     * that existing field is what scopes this to hosting products only,
+     * without a new per-product setting: a product with no "domain" field
+     * (an SSL/email addon, say) never sees any of this.
+     */
+    public bool $productNeedsDomain = false;
+
+    /** register | transfer | existing */
+    public string $domainChoice = 'register';
+
+    /** Register only: the label before the TLD, e.g. "example" for "example.com". */
+    public string $domainLabel = '';
+
+    /** Register only. */
+    public string $domainTld = '';
+
+    /** Transfer/existing: the full domain, e.g. "example.com". */
+    public string $domainFull = '';
+
+    public string $domainAuthCode = '';
+
+    public int $domainYears = 1;
+
+    /** @var array<int, array{tld: string, label: string}> */
+    public array $domainTldOptions = [];
+
     public function mount($product)
     {
         $this->product = $this->category->products()->where('slug', $product)->firstOrFail();
@@ -58,6 +91,16 @@ class Checkout extends Component
                 $this->configOptions[$option->id] = isset($this->configOptions[$option->id]) ? true : false;
             }
             $this->checkoutConfig = (array) $item->checkout_config;
+
+            // The paired domain cart item (if the original order registered
+            // or transferred one) isn't reconstructed here — editing always
+            // re-opens on "existing" with the stored name. Changing choice
+            // back to register/transfer adds a fresh domain line rather than
+            // updating one that might already be sitting in the cart.
+            if (!empty($this->checkoutConfig['domain'])) {
+                $this->domainChoice = 'existing';
+                $this->domainFull = $this->checkoutConfig['domain'];
+            }
         } else {
             // Set the first plan as default
             $this->plan = $this->plan_id ? $this->product->plans->findOrFail($this->plan_id) : $this->product->plans->first();
@@ -85,11 +128,52 @@ class Checkout extends Component
         // Update the pricing
         $this->updatePricing();
 
+        $this->productNeedsDomain = collect($this->getCheckoutConfig())->contains(fn ($config) => ($config['name'] ?? null) === 'domain');
+
+        if ($this->productNeedsDomain) {
+            $this->loadDomainTldOptions();
+        }
+
         // As there is only one plan, config options and checkout config, we can directly call the checkout method to avoid confusion
-        // This is only done when the user is not editing the cart item
-        if ($this->product->plans->count() === 1 && empty($this->configOptions) && empty($this->checkoutConfig)) {
+        // This is only done when the user is not editing the cart item, and never when a domain still needs to be chosen.
+        if (!$this->productNeedsDomain && $this->product->plans->count() === 1 && empty($this->configOptions) && empty($this->checkoutConfig)) {
             $this->checkout();
         }
+    }
+
+    private function loadDomainTldOptions(): void
+    {
+        $currency = $this->domainCurrency();
+
+        $this->domainTldOptions = DomainTld::where('enabled', true)
+            ->with('pricing')
+            ->get()
+            ->map(function (DomainTld $tld) use ($currency) {
+                $price = $tld->priceFor($currency->code);
+
+                if (!$price) {
+                    return null;
+                }
+
+                return [
+                    'tld' => $tld->tld,
+                    'label' => '.' . $tld->tld . ' - ' . ($currency->prefix ?? '') . number_format((float) $price->register_price, 2) . ($currency->suffix ?? ''),
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+
+        if ($this->domainTld === '' && !empty($this->domainTldOptions)) {
+            $this->domainTld = $this->domainTldOptions[0]['tld'];
+        }
+    }
+
+    private function domainCurrency(): Currency
+    {
+        $code = session('currency', config('settings.default_currency'));
+
+        return Currency::find($code) ?? Currency::query()->first() ?? new Currency(['code' => 'USD']);
     }
 
     public function updatePricing()
@@ -166,6 +250,11 @@ class Checkout extends Component
             }
         }
         foreach ($this->getCheckoutConfig() as $key => $config) {
+            // Handled by the domain step below instead of a plain input.
+            if ($this->productNeedsDomain && ($config['name'] ?? null) === 'domain') {
+                continue;
+            }
+
             $validationRules = [];
             if ($config['required'] ?? false) {
                 $validationRules[] = 'required';
@@ -199,7 +288,28 @@ class Checkout extends Component
             }
         }
 
+        if ($this->productNeedsDomain) {
+            $rules = array_merge($rules, $this->domainRules());
+        }
+
         return $rules;
+    }
+
+    private function domainRules(): array
+    {
+        return match ($this->domainChoice) {
+            'register' => [
+                'domainLabel' => ['required', 'regex:/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/i'],
+                'domainTld' => ['required', Rule::in(array_column($this->domainTldOptions, 'tld'))],
+            ],
+            'transfer' => [
+                'domainFull' => ['required', 'regex:/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/i'],
+                'domainAuthCode' => ['required', 'string', 'max:255'],
+            ],
+            default => [ // existing
+                'domainFull' => ['required', 'regex:/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/i'],
+            ],
+        };
     }
 
     public function attributes()
@@ -211,6 +321,11 @@ class Checkout extends Component
         foreach ($this->getCheckoutConfig() as $key => $config) {
             $messages["checkoutConfig.{$config['name']}"] = $config['label'] ?? $config['name'];
         }
+
+        $messages['domainLabel'] = 'domain name';
+        $messages['domainTld'] = 'domain extension';
+        $messages['domainFull'] = 'domain name';
+        $messages['domainAuthCode'] = 'authorisation (EPP) code';
 
         return $messages;
     }
@@ -271,7 +386,54 @@ class Checkout extends Component
         // Ensure checkout config has only the allowed keys and values
         $checkoutConfig = [];
         foreach ($this->getCheckoutConfig() as $config) {
+            if ($this->productNeedsDomain && $config['name'] === 'domain') {
+                continue;
+            }
             $checkoutConfig[$config['name']] = $this->checkoutConfig[$config['name']] ?? null;
+        }
+
+        $domainToAdd = null;
+
+        if ($this->productNeedsDomain) {
+            // The server module always needs a real domain name in its
+            // "domain" checkout-config field regardless of which of the
+            // three choices this was — register/transfer additionally puts
+            // a matching line in the domain cart, existing does not.
+            if ($this->domainChoice === 'register') {
+                $fullDomain = strtolower($this->domainLabel) . '.' . $this->domainTld;
+
+                $availability = (new DomainAvailability)->check([$fullDomain]);
+                if (($availability[$fullDomain] ?? null) === DomainAvailability::TAKEN) {
+                    $this->addError('domainLabel', 'That domain was just taken. Please choose another.');
+
+                    return;
+                }
+
+                $checkoutConfig['domain'] = $fullDomain;
+                $domainToAdd = [$fullDomain, $this->domainTld, 'register', $this->domainYears, null];
+            } elseif ($this->domainChoice === 'transfer') {
+                $fullDomain = strtolower($this->domainFull);
+                $dot = strpos($fullDomain, '.');
+                $tld = $dot !== false ? substr($fullDomain, $dot + 1) : '';
+
+                $checkoutConfig['domain'] = $fullDomain;
+                $domainToAdd = [$fullDomain, $tld, 'transfer', 1, $this->domainAuthCode];
+            } else {
+                // Existing: the customer manages this domain themselves —
+                // nothing to register or transfer, just hand the name to
+                // the server module.
+                $checkoutConfig['domain'] = strtolower($this->domainFull);
+            }
+        }
+
+        if ($domainToAdd) {
+            try {
+                Cart::addDomain(...$domainToAdd);
+            } catch (DisplayException $e) {
+                $this->notify($e->getMessage(), 'error');
+
+                return;
+            }
         }
 
         Cart::add($this->product, $this->plan, $configOptions, $checkoutConfig, key: $this->cartProductKey);

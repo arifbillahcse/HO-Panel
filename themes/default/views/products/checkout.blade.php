@@ -54,6 +54,9 @@
         @endforeach
         @foreach ($this->getCheckoutConfig() as $configOption)
             @php $configOption = (object) $configOption; @endphp
+            @if ($productNeedsDomain && $configOption->name === 'domain')
+                @continue
+            @endif
             <x-form.configoption :config="$configOption" :name="'checkoutConfig.' . $configOption->name">
                 @if ($configOption->type == 'select')
                     @foreach ($configOption->options as $configOptionValue => $configOptionValueName)
@@ -75,6 +78,44 @@
                 @endif
             </x-form.configoption>
         @endforeach
+
+        @if ($productNeedsDomain)
+        <div class="flex flex-col gap-3 border border-neutral rounded-md p-4">
+            <h2 class="text-xl font-semibold">Domain</h2>
+            <p class="text-sm text-base/60">This hosting plan needs a domain to be set up under.</p>
+
+            <div class="flex flex-col gap-2">
+                <label class="flex items-center gap-2">
+                    <input type="radio" wire:model.live="domainChoice" value="register">
+                    Register a new domain
+                </label>
+                <label class="flex items-center gap-2">
+                    <input type="radio" wire:model.live="domainChoice" value="transfer">
+                    Transfer a domain in
+                </label>
+                <label class="flex items-center gap-2">
+                    <input type="radio" wire:model.live="domainChoice" value="existing">
+                    Use a domain I already have
+                </label>
+            </div>
+
+            @if ($domainChoice === 'register')
+            <div class="flex flex-col sm:flex-row gap-2">
+                <x-form.input wire:model="domainLabel" name="domainLabel" placeholder="yourdomain" divClass="!mt-0 flex-1" />
+                <x-form.select wire:model="domainTld" name="domainTld" divClass="!mt-0 sm:w-64">
+                    @foreach ($domainTldOptions as $option)
+                        <option value="{{ $option['tld'] }}">{{ $option['label'] }}</option>
+                    @endforeach
+                </x-form.select>
+            </div>
+            @elseif ($domainChoice === 'transfer')
+            <x-form.input wire:model="domainFull" name="domainFull" label="Domain name" placeholder="yourdomain.com" />
+            <x-form.input wire:model="domainAuthCode" name="domainAuthCode" label="Authorisation (EPP) code" />
+            @else
+            <x-form.input wire:model="domainFull" name="domainFull" label="Domain name" placeholder="yourdomain.com" />
+            @endif
+        </div>
+        @endif
     </div>
     <div class="flex flex-col gap-2 w-full col-span-1 bg-background-secondary p-3 rounded-md h-fit">
         <h2 class="text-2xl font-semibold  mb-2">
